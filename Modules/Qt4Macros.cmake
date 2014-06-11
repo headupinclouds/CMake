@@ -103,7 +103,7 @@ endmacro()
 
 
 # helper macro to set up a moc rule
-macro (QT4_CREATE_MOC_COMMAND infile outfile moc_flags moc_options moc_target)
+function (QT4_CREATE_MOC_COMMAND infile outfile moc_flags moc_options moc_target)
   # For Windows, create a parameters file to work around command line length limit
   # Pass the parameters in a file.  Set the working directory to
   # be that containing the parameters file and reference it by
@@ -144,7 +144,7 @@ macro (QT4_CREATE_MOC_COMMAND infile outfile moc_flags moc_options moc_target)
                       DEPENDS ${infile}
                       ${_moc_working_dir}
                       VERBATIM)
-endmacro ()
+endfunction ()
 
 
 macro (QT4_GENERATE_MOC infile outfile )
@@ -342,7 +342,7 @@ macro(QT4_ADD_DBUS_ADAPTOR _sources _xml_file _include _parentClass) # _optional
 
   if(_optionalClassName)
     add_custom_command(OUTPUT "${_impl}" "${_header}"
-       COMMAND Qt4::qdbuscpp2xml -m -a ${_basename} -c ${_optionalClassName} -i ${_include} -l ${_parentClass} ${_infile}
+       COMMAND Qt4::qdbusxml2cpp -m -a ${_basename} -c ${_optionalClassName} -i ${_include} -l ${_parentClass} ${_infile}
        DEPENDS ${_infile} VERBATIM
     )
   else()

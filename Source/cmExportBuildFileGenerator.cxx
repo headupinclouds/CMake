@@ -52,7 +52,7 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
       }
     if (te->GetType() == cmTarget::INTERFACE_LIBRARY)
       {
-      this->GenerateRequiredCMakeVersion(os, "2.8.12.20131007"); // 2.8.13
+      this->GenerateRequiredCMakeVersion(os, "3.0.0");
       }
     }
 

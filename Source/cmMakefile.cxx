@@ -893,9 +893,12 @@ cmMakefile::AddCustomCommandToTarget(const char* target,
     {
     cmake::MessageType messageType = cmake::AUTHOR_WARNING;
     bool issueMessage = false;
+    cmOStringStream e;
     switch(this->GetPolicyStatus(cmPolicies::CMP0040))
       {
       case cmPolicies::WARN:
+        e << (this->GetPolicies()
+          ->GetPolicyWarning(cmPolicies::CMP0040)) << "\n";
         issueMessage = true;
       case cmPolicies::OLD:
         break;
@@ -908,9 +911,6 @@ cmMakefile::AddCustomCommandToTarget(const char* target,
 
     if(issueMessage)
       {
-      cmOStringStream e;
-      e << (this->GetPolicies()
-        ->GetPolicyWarning(cmPolicies::CMP0040)) << "\n";
       e << "The target name \"" << target << "\" is unknown in this context.";
       IssueMessage(messageType, e.str().c_str());
       }
@@ -922,6 +922,14 @@ cmMakefile::AddCustomCommandToTarget(const char* target,
     {
     cmOStringStream e;
     e << "Target \"" << target << "\" is an OBJECT library "
+      "that may not have PRE_BUILD, PRE_LINK, or POST_BUILD commands.";
+    this->IssueMessage(cmake::FATAL_ERROR, e.str());
+    return;
+    }
+  if(ti->second.GetType() == cmTarget::INTERFACE_LIBRARY)
+    {
+    cmOStringStream e;
+    e << "Target \"" << target << "\" is an INTERFACE library "
       "that may not have PRE_BUILD, PRE_LINK, or POST_BUILD commands.";
     this->IssueMessage(cmake::FATAL_ERROR, e.str());
     return;
@@ -4340,6 +4348,22 @@ cmMakefile::GetPolicyStatusInternal(cmPolicies::PolicyID id) const
 
   // The policy is not set.  Use the default for this CMake version.
   return this->GetPolicies()->GetPolicyStatus(id);
+}
+
+//----------------------------------------------------------------------------
+bool cmMakefile::PolicyOptionalWarningEnabled(std::string const& var)
+{
+  // Check for an explicit CMAKE_POLICY_WARNING_CMP<NNNN> setting.
+  if(!var.empty())
+    {
+    if(const char* val = this->GetDefinition(var.c_str()))
+      {
+      return cmSystemTools::IsOn(val);
+      }
+    }
+  // Enable optional policy warnings with --debug-output or --trace.
+  cmake* cm = this->GetCMakeInstance();
+  return cm->GetDebugOutput() || cm->GetTrace();
 }
 
 bool cmMakefile::SetPolicy(const char *id,

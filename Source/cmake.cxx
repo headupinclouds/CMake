@@ -653,7 +653,7 @@ void cmake::SetArgs(const std::vector<std::string>& args,
       cmSystemTools::ConvertToUnixSlashes(path);
       this->SetHomeOutputDirectory(path.c_str());
       }
-    else if((i < args.size()-1) && (arg.find("--check-build-system",0) == 0))
+    else if((i < args.size()-2) && (arg.find("--check-build-system",0) == 0))
       {
       this->CheckBuildSystemArgument = args[++i];
       this->ClearBuildSystem = (atoi(args[++i].c_str()) > 0);
@@ -1231,7 +1231,10 @@ int cmake::HandleDeleteCacheVariables(const char* var)
     if(ci.Find(save.key.c_str()))
       {
       save.type = ci.GetType();
-      save.help = ci.GetProperty("HELPSTRING");
+      if(const char* help = ci.GetProperty("HELPSTRING"))
+        {
+        save.help = help;
+        }
       }
     saved.push_back(save);
     }
@@ -2664,11 +2667,17 @@ int cmake::Build(const std::string& dir,
     }
   if(!it.Find("CMAKE_GENERATOR"))
     {
-    std::cerr << "Error: could find generator in Cache\n";
+    std::cerr << "Error: could not find CMAKE_GENERATOR in Cache\n";
     return 1;
     }
   cmsys::auto_ptr<cmGlobalGenerator> gen(
     this->CreateGlobalGenerator(it.GetValue()));
+  if(!gen.get())
+    {
+    std::cerr << "Error: could create CMAKE_GENERATOR \""
+              << it.GetValue() << "\"\n";
+    return 1;
+    }
   std::string output;
   std::string projName;
   if(!it.Find("CMAKE_PROJECT_NAME"))

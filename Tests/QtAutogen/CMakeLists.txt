@@ -58,11 +58,17 @@ add_custom_target(generate_moc_input
   COMMAND ${CMAKE_COMMAND} -E rename "${CMAKE_CURRENT_BINARY_DIR}/myinterface.h.in" "${CMAKE_CURRENT_BINARY_DIR}/myinterface.h"
 )
 
+add_custom_command(
+  OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/myotherinterface.h"
+  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/myotherinterface.h.in" "${CMAKE_CURRENT_BINARY_DIR}/myotherinterface.h"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/myotherinterface.h.in"
+)
+
 add_executable(QtAutogen main.cpp calwidget.cpp foo.cpp blub.cpp bar.cpp abc.cpp
                xyz.cpp yaf.cpp gadget.cpp $<TARGET_OBJECTS:privateSlot>
                test.qrc resourcetester.cpp generated.cpp
 )
-set_property(TARGET QtAutogen APPEND PROPERTY AUTOGEN_TARGET_DEPENDS generate_moc_input)
+set_property(TARGET QtAutogen APPEND PROPERTY AUTOGEN_TARGET_DEPENDS generate_moc_input "${CMAKE_CURRENT_BINARY_DIR}/myotherinterface.h")
 
 set_target_properties(QtAutogen codeeditorLib privateSlot PROPERTIES AUTOMOC TRUE)
 
@@ -82,12 +88,18 @@ target_link_libraries(libC LINK_PUBLIC libB)
 
 target_link_libraries(QtAutogen codeeditorLib ${QT_LIBRARIES} libC)
 
-add_library(empty STATIC empty.cpp)
+# Add not_generated_file.qrc to the source list to get the file-level
+# dependency, but don't generate a c++ file from it.  Disable the AUTORCC
+# feature for this target.  This tests that qrc files in the sources don't
+# have an effect on generation if AUTORCC is off.
+add_library(empty STATIC empty.cpp not_generated_file.qrc)
+set_target_properties(empty PROPERTIES AUTORCC OFF)
+
 set_target_properties(empty PROPERTIES AUTOMOC TRUE)
 target_link_libraries(empty no_link_language)
 add_library(no_link_language STATIC empty.h)
 set_target_properties(no_link_language PROPERTIES AUTOMOC TRUE)
 
-qtx_wrap_cpp(uicOnlyMoc uiconly.h)
-add_executable(uiconly uiconly.cpp ${uicOnlyMoc})
+qtx_wrap_cpp(uicOnlyMoc sub/uiconly.h)
+add_executable(uiconly sub/uiconly.cpp ${uicOnlyMoc})
 target_link_libraries(uiconly ${QT_LIBRARIES})

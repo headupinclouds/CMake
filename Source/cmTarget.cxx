@@ -317,8 +317,7 @@ void cmTarget::SetMakefile(cmMakefile* mf)
     // variable only for non-executable targets.  This preserves
     // compatibility with previous CMake versions in which executables
     // did not support this variable.  Projects may still specify the
-    // property directly.  TODO: Make this depend on backwards
-    // compatibility setting.
+    // property directly.
     if(this->TargetTypeValue != cmTarget::EXECUTABLE
         && this->TargetTypeValue != cmTarget::INTERFACE_LIBRARY)
       {
@@ -404,11 +403,10 @@ void cmTarget::SetMakefile(cmMakefile* mf)
 //----------------------------------------------------------------------------
 void cmTarget::AddUtility(const char *u, cmMakefile *makefile)
 {
-  this->Utilities.insert(u);
-  if(makefile)
-  {
+  if(this->Utilities.insert(u).second && makefile)
+    {
     makefile->GetBacktrace(UtilityBacktraces[u]);
-  }
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -552,6 +550,7 @@ bool cmTarget::FindSourceFiles()
 //----------------------------------------------------------------------------
 void cmTarget::GetSourceFiles(std::vector<cmSourceFile*> &files) const
 {
+  assert(this->GetType() != INTERFACE_LIBRARY);
   files = this->SourceFiles;
 }
 
@@ -591,6 +590,38 @@ cmSourceFile* cmTarget::AddSource(const char* s)
   // For backwards compatibility replace varibles in source names.
   // This should eventually be removed.
   this->Makefile->ExpandVariablesInString(src);
+  if (src != s)
+    {
+    cmOStringStream e;
+    bool noMessage = false;
+    cmake::MessageType messageType = cmake::AUTHOR_WARNING;
+    switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0049))
+      {
+      case cmPolicies::WARN:
+        e << (this->Makefile->GetPolicies()
+              ->GetPolicyWarning(cmPolicies::CMP0049)) << "\n";
+        break;
+      case cmPolicies::OLD:
+        noMessage = true;
+        break;
+      case cmPolicies::REQUIRED_ALWAYS:
+      case cmPolicies::REQUIRED_IF_USED:
+      case cmPolicies::NEW:
+        messageType = cmake::FATAL_ERROR;
+      }
+    if (!noMessage)
+      {
+      e << "Legacy variable expansion in source file \""
+        << s << "\" expanded to \"" << src << "\" in target \""
+        << this->GetName() << "\".  This behavior will be removed in a "
+        "future version of CMake.";
+      this->Makefile->IssueMessage(messageType, e.str().c_str());
+      if (messageType == cmake::FATAL_ERROR)
+        {
+        return 0;
+        }
+      }
+    }
 
   cmSourceFile* sf = this->Makefile->GetOrCreateSource(src.c_str());
   this->AddSourceFile(sf);
@@ -1698,7 +1729,7 @@ static void processIncludeDirectories(cmTarget const* tgt,
         cmake::MessageType messageType = cmake::FATAL_ERROR;
         if (fromEvaluatedImported)
           {
-          switch(mf->GetPolicyStatus(cmPolicies::CMP0027))
+          switch(tgt->GetPolicyStatusCMP0027())
             {
             case cmPolicies::WARN:
               e << (mf->GetPolicies()
@@ -2593,23 +2624,20 @@ const char* cmTarget::GetFeature(const char* feature, const char* config) const
 }
 
 //----------------------------------------------------------------------------
-const char *cmTarget::GetProperty(const char* prop) const
-{
-  return this->GetProperty(prop, cmProperty::TARGET);
-}
-
-//----------------------------------------------------------------------------
-bool cmTarget::HandleLocationPropertyPolicy() const
+bool cmTarget::HandleLocationPropertyPolicy(cmMakefile* context) const
 {
   if (this->IsImported())
     {
     return true;
     }
+  cmOStringStream e;
   const char *modal = 0;
   cmake::MessageType messageType = cmake::AUTHOR_WARNING;
-  switch (this->Makefile->GetPolicyStatus(cmPolicies::CMP0026))
+  switch (context->GetPolicyStatus(cmPolicies::CMP0026))
     {
     case cmPolicies::WARN:
+      e << (this->Makefile->GetPolicies()
+        ->GetPolicyWarning(cmPolicies::CMP0026)) << "\n";
       modal = "should";
     case cmPolicies::OLD:
       break;
@@ -2622,22 +2650,25 @@ bool cmTarget::HandleLocationPropertyPolicy() const
 
   if (modal)
     {
-    cmOStringStream e;
-    e << (this->Makefile->GetPolicies()
-          ->GetPolicyWarning(cmPolicies::CMP0026)) << "\n";
     e << "The LOCATION property " << modal << " not be read from target \""
       << this->GetName() << "\".  Use the target name directly with "
       "add_custom_command, or use the generator expression $<TARGET_FILE>, "
       "as appropriate.\n";
-    this->Makefile->IssueMessage(messageType, e.str().c_str());
+    context->IssueMessage(messageType, e.str().c_str());
     }
 
   return messageType != cmake::FATAL_ERROR;
 }
 
 //----------------------------------------------------------------------------
+const char *cmTarget::GetProperty(const char* prop) const
+{
+  return this->GetProperty(prop, this->Makefile);
+}
+
+//----------------------------------------------------------------------------
 const char *cmTarget::GetProperty(const char* prop,
-                                  cmProperty::ScopeType scope) const
+                                  cmMakefile* context) const
 {
   if(!prop)
     {
@@ -2650,7 +2681,7 @@ const char *cmTarget::GetProperty(const char* prop,
     cmOStringStream e;
     e << "INTERFACE_LIBRARY targets may only have whitelisted properties.  "
          "The property \"" << prop << "\" is not allowed.";
-    this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str().c_str());
+    context->IssueMessage(cmake::FATAL_ERROR, e.str().c_str());
     return 0;
     }
 
@@ -2669,7 +2700,7 @@ const char *cmTarget::GetProperty(const char* prop,
     {
     if(strcmp(prop,"LOCATION") == 0)
       {
-      if (!this->HandleLocationPropertyPolicy())
+      if (!this->HandleLocationPropertyPolicy(context))
         {
         return 0;
         }
@@ -2690,7 +2721,7 @@ const char *cmTarget::GetProperty(const char* prop,
     // Support "LOCATION_<CONFIG>".
     if(cmHasLiteralPrefix(prop, "LOCATION_"))
       {
-      if (!this->HandleLocationPropertyPolicy())
+      if (!this->HandleLocationPropertyPolicy(context))
         {
         return 0;
         }
@@ -2698,6 +2729,21 @@ const char *cmTarget::GetProperty(const char* prop,
       this->Properties.SetProperty(prop,
                                    this->GetLocation(configName.c_str()),
                                    cmProperty::TARGET);
+      }
+    // Support "<CONFIG>_LOCATION".
+    if(cmHasLiteralSuffix(prop, "_LOCATION"))
+      {
+      std::string configName(prop, strlen(prop) - 9);
+      if(configName != "IMPORTED")
+        {
+        if (!this->HandleLocationPropertyPolicy(context))
+          {
+          return 0;
+          }
+        this->Properties.SetProperty(prop,
+                                     this->GetLocation(configName.c_str()),
+                                     cmProperty::TARGET);
+        }
       }
     }
   if(strcmp(prop,"INCLUDE_DIRECTORIES") == 0)
@@ -2811,10 +2857,10 @@ const char *cmTarget::GetProperty(const char* prop,
     }
   bool chain = false;
   const char *retVal =
-    this->Properties.GetPropertyValue(prop, scope, chain);
+    this->Properties.GetPropertyValue(prop, cmProperty::TARGET, chain);
   if (chain)
     {
-    return this->Makefile->GetProperty(prop,scope);
+    return this->Makefile->GetProperty(prop, cmProperty::TARGET);
     }
   return retVal;
 }
@@ -2832,12 +2878,54 @@ public:
   cmTargetCollectLinkLanguages(cmTarget const* target, const char* config,
                                std::set<cmStdString>& languages,
                                cmTarget const* head):
-    Config(config), Languages(languages), HeadTarget(head)
+    Config(config), Languages(languages), HeadTarget(head),
+    Makefile(target->GetMakefile()), Target(target)
   { this->Visited.insert(target); }
 
-  void Visit(cmTarget const* target)
+  void Visit(const std::string& name)
     {
-    if(!target || !this->Visited.insert(target).second)
+    cmTarget *target = this->Makefile->FindTargetToUse(name);
+
+    if(!target)
+      {
+      if(name.find("::") != std::string::npos)
+        {
+        bool noMessage = false;
+        cmake::MessageType messageType = cmake::FATAL_ERROR;
+        cmOStringStream e;
+        switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0028))
+          {
+          case cmPolicies::WARN:
+            {
+            e << (this->Makefile->GetPolicies()
+                  ->GetPolicyWarning(cmPolicies::CMP0028)) << "\n";
+            messageType = cmake::AUTHOR_WARNING;
+            }
+            break;
+          case cmPolicies::OLD:
+            noMessage = true;
+          case cmPolicies::REQUIRED_IF_USED:
+          case cmPolicies::REQUIRED_ALWAYS:
+          case cmPolicies::NEW:
+            // Issue the fatal message.
+            break;
+          }
+
+        if(!noMessage)
+          {
+          e << "Target \"" << this->Target->GetName()
+            << "\" links to target \"" << name
+            << "\" but the target was not found.  Perhaps a find_package() "
+            "call is missing for an IMPORTED target, or an ALIAS target is "
+            "missing?";
+          this->Makefile->GetCMakeInstance()->IssueMessage(messageType,
+                                                e.str(),
+                                                this->Target->GetBacktrace());
+          }
+        }
+      return;
+      }
+    if(!this->Visited.insert(target).second)
       {
       return;
       }
@@ -2852,17 +2940,18 @@ public:
       this->Languages.insert(*li);
       }
 
-    cmMakefile* mf = target->GetMakefile();
     for(std::vector<std::string>::const_iterator
           li = iface->Libraries.begin(); li != iface->Libraries.end(); ++li)
       {
-      this->Visit(mf->FindTargetToUse(*li));
+      this->Visit(*li);
       }
     }
 private:
   const char* Config;
   std::set<cmStdString>& Languages;
   cmTarget const* HeadTarget;
+  cmMakefile* Makefile;
+  const cmTarget* Target;
   std::set<cmTarget const*> Visited;
 };
 
@@ -2964,7 +3053,7 @@ void cmTarget::ComputeLinkClosure(const char* config, LinkClosure& lc,
   for(std::vector<std::string>::const_iterator li = impl->Libraries.begin();
       li != impl->Libraries.end(); ++li)
     {
-    cll.Visit(this->Makefile->FindTargetToUse(*li));
+    cll.Visit(*li);
     }
 
   // Store the transitive closure of languages.
@@ -5426,11 +5515,6 @@ bool cmTarget::ComputeLinkInterface(const char* config, LinkInterface& iface,
               }
             }
           }
-        if(this->LinkLanguagePropagatesToDependents())
-          {
-          // Targets using this archive need its language runtime libraries.
-          iface.Languages = impl->Languages;
-          }
         }
       }
     }
@@ -5447,11 +5531,6 @@ bool cmTarget::ComputeLinkInterface(const char* config, LinkInterface& iface,
     iface.ImplementationIsInterface = true;
     iface.Libraries = impl->Libraries;
     iface.WrongConfigLibraries = impl->WrongConfigLibraries;
-    if(this->LinkLanguagePropagatesToDependents())
-      {
-      // Targets using this archive need its language runtime libraries.
-      iface.Languages = impl->Languages;
-      }
 
     if(this->PolicyStatusCMP0022 == cmPolicies::WARN &&
        !this->Internal->PolicyWarnedCMP0022)
@@ -5515,6 +5594,16 @@ bool cmTarget::ComputeLinkInterface(const char* config, LinkInterface& iface,
         this->Makefile->IssueMessage(cmake::AUTHOR_WARNING, w.str());
         this->Internal->PolicyWarnedCMP0022 = true;
         }
+      }
+    }
+
+  if(this->LinkLanguagePropagatesToDependents())
+    {
+    // Targets using this archive need its language runtime libraries.
+    if(LinkImplementation const* impl =
+       this->GetLinkImplementation(config, headTarget))
+      {
+      iface.Languages = impl->Languages;
       }
     }
 
@@ -5587,7 +5676,7 @@ void cmTarget::ComputeLinkImplementation(const char* config,
         bool noMessage = false;
         cmake::MessageType messageType = cmake::FATAL_ERROR;
         cmOStringStream e;
-        switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0038))
+        switch(this->GetPolicyStatusCMP0038())
           {
           case cmPolicies::WARN:
             {
@@ -5618,46 +5707,6 @@ void cmTarget::ComputeLinkImplementation(const char* config,
           }
         }
       continue;
-      }
-    cmTarget *tgt = this->Makefile->FindTargetToUse(*li);
-
-    if(!tgt && std::string(item).find("::") != std::string::npos)
-      {
-      bool noMessage = false;
-      cmake::MessageType messageType = cmake::FATAL_ERROR;
-      cmOStringStream e;
-      switch(this->Makefile->GetPolicyStatus(cmPolicies::CMP0028))
-        {
-        case cmPolicies::WARN:
-          {
-          e << (this->Makefile->GetPolicies()
-                ->GetPolicyWarning(cmPolicies::CMP0028)) << "\n";
-          messageType = cmake::AUTHOR_WARNING;
-          }
-          break;
-        case cmPolicies::OLD:
-          noMessage = true;
-        case cmPolicies::REQUIRED_IF_USED:
-        case cmPolicies::REQUIRED_ALWAYS:
-        case cmPolicies::NEW:
-          // Issue the fatal message.
-          break;
-        }
-
-      if(!noMessage)
-        {
-        e << "Target \"" << this->GetName() << "\" links to target \"" << item
-          << "\" but the target was not found.  Perhaps a find_package() "
-          "call is missing for an IMPORTED target, or an ALIAS target is "
-          "missing?";
-        this->Makefile->GetCMakeInstance()->IssueMessage(messageType,
-                                                      e.str(),
-                                                      this->GetBacktrace());
-        if (messageType == cmake::FATAL_ERROR)
-          {
-          return;
-          }
-        }
       }
 
     // The entry is meant for this configuration.

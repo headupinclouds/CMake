@@ -176,7 +176,7 @@ bool cmExportInstallFileGenerator::GenerateMainFile(std::ostream& os)
 
   if (require3_0_0)
     {
-    this->GenerateRequiredCMakeVersion(os, "2.8.12.20131007");
+    this->GenerateRequiredCMakeVersion(os, "3.0.0");
     }
   else if (require2_8_12)
     {

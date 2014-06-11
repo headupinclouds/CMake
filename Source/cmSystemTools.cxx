@@ -864,6 +864,44 @@ bool cmSystemTools::CopyFileIfDifferent(const char* source,
 }
 
 //----------------------------------------------------------------------------
+#ifdef _WIN32
+cmSystemTools::WindowsFileRetry cmSystemTools::GetWindowsFileRetry()
+{
+  static WindowsFileRetry retry = {0,0};
+  if(!retry.Count)
+    {
+    unsigned int data[2] = {0,0};
+    HKEY const keys[2] = {HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    wchar_t const* const values[2] = {L"FilesystemRetryCount",
+                                      L"FilesystemRetryDelay"};
+    for(int k=0; k < 2; ++k)
+      {
+      HKEY hKey;
+      if(RegOpenKeyExW(keys[k], L"Software\\Kitware\\CMake\\Config",
+                       0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+        {
+        for(int v=0; v < 2; ++v)
+          {
+          DWORD dwData, dwType, dwSize = 4;
+          if(!data[v] &&
+             RegQueryValueExW(hKey, values[v], 0, &dwType, (BYTE *)&dwData,
+                              &dwSize) == ERROR_SUCCESS &&
+             dwType == REG_DWORD && dwSize == 4)
+            {
+            data[v] = static_cast<unsigned int>(dwData);
+            }
+          }
+        RegCloseKey(hKey);
+        }
+      }
+    retry.Count = data[0]? data[0] : 5;
+    retry.Delay = data[1]? data[1] : 500;
+    }
+  return retry;
+}
+#endif
+
+//----------------------------------------------------------------------------
 bool cmSystemTools::RenameFile(const char* oldname, const char* newname)
 {
 #ifdef _WIN32
@@ -874,13 +912,15 @@ bool cmSystemTools::RenameFile(const char* oldname, const char* newname)
      fails then remove the read-only attribute from any existing destination.
      Try multiple times since we may be racing against another process
      creating/opening the destination file just before our MoveFileEx.  */
-  int tries = 5;
+  WindowsFileRetry retry = cmSystemTools::GetWindowsFileRetry();
   while(!MoveFileExW(cmsys::Encoding::ToWide(oldname).c_str(),
                      cmsys::Encoding::ToWide(newname).c_str(),
-                     MOVEFILE_REPLACE_EXISTING) && --tries)
+                     MOVEFILE_REPLACE_EXISTING) && --retry.Count)
     {
-    // Try again only if failure was due to access permissions.
-    if(GetLastError() != ERROR_ACCESS_DENIED)
+    DWORD last_error = GetLastError();
+    // Try again only if failure was due to access/sharing permissions.
+    if(last_error != ERROR_ACCESS_DENIED &&
+       last_error != ERROR_SHARING_VIOLATION)
       {
       return false;
       }
@@ -896,10 +936,10 @@ bool cmSystemTools::RenameFile(const char* oldname, const char* newname)
     else
       {
       // The file may be temporarily in use so wait a bit.
-      cmSystemTools::Delay(100);
+      cmSystemTools::Delay(retry.Delay);
       }
     }
-  return tries > 0;
+  return retry.Count > 0;
 #else
   /* On UNIX we have an OS-provided call to do this atomically.  */
   return rename(oldname, newname) == 0;

@@ -1058,18 +1058,6 @@ ${CMake_BINARY_DIR}/bin/cmake -DVERSION=master -P ${CMake_SOURCE_DIR}/Utilities/
   # because of the registry write these tests depend on each other
   set_tests_properties ( complex PROPERTIES DEPENDS complexOneConfig)
 
-  add_test(Example ${CMAKE_CTEST_COMMAND}
-    --build-and-test
-    "${CMake_SOURCE_DIR}/Example"
-    "${CMake_BINARY_DIR}/Example"
-    ${build_generator_args}
-    --build-project HELLO
-    --build-exe-dir "${CMake_BINARY_DIR}/Example/Demo"
-    --build-options ${build_options}
-    --test-command helloDemo
-    )
-  list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Example")
-
   add_test(Environment ${CMAKE_CTEST_COMMAND}
     --build-and-test
     "${CMake_SOURCE_DIR}/Tests/Environment"
@@ -1191,6 +1179,18 @@ ${CMake_BINARY_DIR}/bin/cmake -DVERSION=master -P ${CMake_SOURCE_DIR}/Utilities/
         --test-command ${CMAKE_CTEST_COMMAND} -V
         )
       list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/Qt4And5Automoc")
+      add_test(Qt4And5AutomocReverse ${CMAKE_CTEST_COMMAND}
+        --build-and-test
+        "${CMake_SOURCE_DIR}/Tests/Qt4And5Automoc"
+        "${CMake_BINARY_DIR}/Tests/Qt4And5AutomocReverse"
+        ${build_generator_args}
+        --build-project Qt4And5Automoc
+        --build-exe-dir "${CMake_BINARY_DIR}/Tests/Qt4And5AutomocReverse"
+        --force-new-ctest-process
+        --build-options ${build_options} -DQT_REVERSE_FIND_ORDER=1
+        --test-command ${CMAKE_CTEST_COMMAND} -V
+        )
+      list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/Qt4And5AutomocReverse")
     endif()
   endif()
 
@@ -2243,6 +2243,18 @@ ${CMake_BINARY_DIR}/bin/cmake -DVERSION=master -P ${CMake_SOURCE_DIR}/Utilities/
   endif()
   set_tests_properties(CTestTestBadExe PROPERTIES
     PASS_REGULAR_EXPRESSION "${CTestTestBadExe_REGEX}")
+
+  configure_file(
+    "${CMake_SOURCE_DIR}/Tests/CTestTestBadGenerator/test.cmake.in"
+    "${CMake_BINARY_DIR}/Tests/CTestTestBadGenerator/test.cmake"
+    @ONLY ESCAPE_QUOTES)
+  add_test(CTestTestBadGenerator ${CMAKE_CTEST_COMMAND}
+    -C "\${CTestTest_CONFIG}"
+    -S "${CMake_BINARY_DIR}/Tests/CTestTestBadGenerator/test.cmake" -V
+    --output-log "${CMake_BINARY_DIR}/Tests/CTestTestBadGenerator/testOutput.log"
+    )
+  set_property(TEST CTestTestBadGenerator PROPERTY
+    PASS_REGULAR_EXPRESSION "could not create generator named \"Bad Generator\"")
 
   configure_file(
     "${CMake_SOURCE_DIR}/Tests/CTestTestParallel/test.cmake.in"

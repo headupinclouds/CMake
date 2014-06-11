@@ -263,7 +263,8 @@ void cmLocalGenerator::TraceDependencies()
   for(cmGeneratorTargetsType::iterator t = targets.begin();
       t != targets.end(); ++t)
     {
-    if (t->second->Target->IsImported())
+    if (t->second->Target->IsImported()
+        || t->second->Target->GetType() == cmTarget::INTERFACE_LIBRARY)
       {
       continue;
       }
@@ -1989,7 +1990,7 @@ void cmLocalGenerator::AddArchitectureFlags(std::string& flags,
       flags += " ";
       flags += sysrootFlag;
       flags += " ";
-      flags += sysroot;
+      flags += this->Convert(sysroot, NONE, SHELL);
       }
 
     if (deploymentTargetFlag && *deploymentTargetFlag &&
@@ -3362,7 +3363,7 @@ cmLocalGenerator::GetTargetDirectory(cmTarget const&) const
 }
 
 //----------------------------------------------------------------------------
-unsigned int cmLocalGenerator::GetBackwardsCompatibility()
+cmIML_INT_uint64_t cmLocalGenerator::GetBackwardsCompatibility()
 {
   // The computed version may change until the project is fully
   // configured.
@@ -3415,7 +3416,7 @@ bool cmLocalGenerator::NeedBackwardsCompatibility_2_4()
 
   // Compatibility is needed if CMAKE_BACKWARDS_COMPATIBILITY is set
   // equal to or lower than the given version.
-  unsigned int actual_compat = this->GetBackwardsCompatibility();
+  cmIML_INT_uint64_t actual_compat = this->GetBackwardsCompatibility();
   return (actual_compat &&
           actual_compat <= CMake_VERSION_ENCODE(2, 4, 255));
 }

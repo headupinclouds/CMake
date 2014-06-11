@@ -112,6 +112,12 @@ Each command may be invoked with multiple uses of each keyword:
     INTERFACE USING_ARCHIVE_LIB
   )
 
+Note that usage requirements are not designed as a way to make downstreams
+use particular :prop_tgt:`COMPILE_OPTIONS` or
+:prop_tgt:`COMPILE_DEFINITIONS` etc for convenience only.  The contents of
+the properties must be **requirements**, not merely recommendations or
+convenience.
+
 Target Properties
 -----------------
 
@@ -171,11 +177,14 @@ can be enabled to add the corresponding directories to the
 targets in multiple different directories convenient through use of the
 :command:`target_link_libraries` command.
 
+
+.. _`Target Usage Requirements`:
+
 Transitive Usage Requirements
 -----------------------------
 
 The usage requirements of a target can transitively propagate to dependents.
-The :command:`target_link_libraries` command also has ``PRIVATE``,
+The :command:`target_link_libraries` command has ``PRIVATE``,
 ``INTERFACE`` and ``PUBLIC`` keywords to control the propagation.
 
 .. code-block:: cmake
@@ -217,6 +226,26 @@ each keyword:
     PUBLIC archive
     PRIVATE serialization
   )
+
+Usage requirements are propagated by reading the ``INTERFACE_`` variants
+of target properties from dependencies and appending the values to the
+non-``INTERFACE_`` variants of the operand.  For example, the
+:prop_tgt:`INTERFACE_INCLUDE_DIRECTORIES` of dependencies is read and
+appended to the :prop_tgt:`INCLUDE_DIRECTORIES` of the operand.  In cases
+where order is relevant and maintained, and the order resulting from the
+:command:`target_link_libraries` calls does not allow correct compilation,
+use of an appropriate command to set the property directly may update the
+order.
+
+For example, if the linked libraries for a target must be specified
+in the order ``lib1`` ``lib2`` ``lib3`` , but the include directories must
+be specified in the order ``lib3`` ``lib1`` ``lib2``:
+
+.. code-block:: cmake
+
+  target_link_libraries(myExe lib1 lib2 lib3)
+  target_include_directories(myExe
+    PRIVATE $<TARGET_PROPERTY:INTERFACE_INCLUDE_DIRECTORIES:lib3>)
 
 .. _`Compatible Interface Properties`:
 
@@ -357,6 +386,10 @@ calculate the numeric minimum value for a property from dependencies.
 Each calculated "compatible" property value may be read in the consumer at
 generate-time using generator expressions.
 
+Note that for each dependee, the set of properties specified in each
+compatible interface property must not intersect with the set specified in
+any of the other properties.
+
 Property Origin Debugging
 -------------------------
 
@@ -365,10 +398,8 @@ locality of code which creates a target and code which is responsible for
 setting build specifications may make the code more difficult to reason about.
 :manual:`cmake(1)` provides a debugging facility to print the origin of the
 contents of properties which may be determined by dependencies.  The properties
-which can be debugged are :prop_tgt:`INCLUDE_DIRECTORIES`,
-:prop_tgt:`COMPILE_DEFINITIONS`, :prop_tgt:`COMPILE_OPTIONS`,
-:prop_tgt:`AUTOUIC_OPTIONS`, and all properties listed in a
-``COMPATIBLE_INTERFACE_*`` target property:
+which can be debugged are listed in the
+:variable:`CMAKE_DEBUG_TARGET_PROPERTIES` variable documentation:
 
 .. code-block:: cmake
 
@@ -517,6 +548,8 @@ with either ``-DClimbingStats_FROM_BUILD_LOCATION`` or
 ``-DClimbingStats_FROM_INSTALL_LOCATION``.  For more about packages and
 exporting see the :manual:`cmake-packages(7)` manual.
 
+.. _`Include Directories and Usage Requirements`:
+
 Include Directories and Usage Requirements
 ''''''''''''''''''''''''''''''''''''''''''
 
@@ -545,9 +578,19 @@ expands to the installation prefix when imported by a consuming project.
 Include directories usage requirements commonly differ between the build-tree
 and the install-tree.  The ``BUILD_INTERFACE`` and ``INSTALL_INTERFACE``
 generator expressions can be used to describe separate usage requirements
-based on the usage location.  Relative paths are allowed within these
-expressions, and are interpreted relative to the current source directory
-or the installation prefix, as appropriate.
+based on the usage location.  Relative paths are allowed within the
+``INSTALL_INTERFACE`` expression and are interpreted relative to the
+installation prefix.  For example:
+
+.. code-block:: cmake
+
+  add_library(ClimbingStats climbingstats.cpp)
+  target_include_directories(ClimbingStats INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>
+    $<INSTALL_INTERFACE:/absolute/path>
+    $<INSTALL_INTERFACE:relative/path>
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/$<CONFIG>/generated>
+  )
 
 Two convenience APIs are provided relating to include directories usage
 requirements.  The :variable:`CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE` variable
@@ -574,6 +617,14 @@ command:
 This is equivalent to appending ``${CMAKE_INSTALL_PREFIX}/include`` to the
 :prop_tgt:`INTERFACE_INCLUDE_DIRECTORIES` of each of the installed
 :prop_tgt:`IMPORTED` targets when generated by :command:`install(EXPORT)`.
+
+When the :prop_tgt:`INTERFACE_INCLUDE_DIRECTORIES` of an
+:ref:`imported target <Imported targets>` is consumed, the entries in the
+property are treated as ``SYSTEM`` include directories, as if they were
+listed in the :prop_tgt:`INTERFACE_SYSTEM_INCLUDE_DIRECTORIES` of the
+dependency. This can result in omission of compiler warnings for headers
+found in those directories.  This behavior for :ref:`imported targets` may
+be controlled with the :prop_tgt:`NO_SYSTEM_FROM_IMPORTED` target property.
 
 If a binary target is linked transitively to a Mac OX framework, the
 ``Headers`` directory of the framework is also treated as a usage requirement.
@@ -634,12 +685,14 @@ target at a time.  The commands :command:`add_definitions`,
 a similar function, but operate at directory scope instead of target
 scope for convenience.
 
-Psuedo Targets
+Pseudo Targets
 ==============
 
 Some target types do not represent outputs of the buildsystem, but only inputs
 such as external dependencies, aliases or other non-build artifacts.  Pseudo
 targets are not represented in the generated buildsystem.
+
+.. _`Imported Targets`:
 
 Imported Targets
 ----------------
@@ -676,6 +729,8 @@ accessible globally in the buildsystem.
 
 See the :manual:`cmake-packages(7)` manual for more on creating packages
 with :prop_tgt:`IMPORTED` targets.
+
+.. _`Alias Targets`:
 
 Alias Targets
 -------------
@@ -717,6 +772,8 @@ property from it:
   if(_aliased)
     message(STATUS "The name Upstream::lib1 is an ALIAS for ${_aliased}.")
   endif()
+
+.. _`Interface Libraries`:
 
 Interface Libraries
 -------------------
@@ -772,6 +829,16 @@ requirements:
 This way, the build specification of ``exe1`` is expressed entirely as linked
 targets, and the complexity of compiler-specific flags is encapsulated in an
 ``INTERFACE`` library target.
+
+The properties permitted to be set on or read from an ``INTERFACE`` library
+are:
+
+* Properties matching ``INTERFACE_*``
+* Built-in properties matching ``COMPATIBLE_INTERFACE_*``
+* ``EXPORT_NAME``
+* ``IMPORTED``
+* ``NAME``
+* Properties matching ``MAP_IMPORTED_CONFIG_*``
 
 ``INTERFACE`` libraries may be installed and exported.  Any content they refer
 to must be installed separately:

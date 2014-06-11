@@ -23,7 +23,8 @@
 # .. note::
 #
 #  When using :prop_tgt:`IMPORTED` targets, the qtmain.lib static library is
-#  automatically linked on Windows. To disable that globally, set the
+#  automatically linked on Windows for :variable:`WIN32 <WIN32_EXECUTABLE>`
+#  executables. To disable that globally, set the
 #  ``QT4_NO_LINK_QTMAIN`` variable before finding Qt4. To disable that
 #  for a particular executable, set the ``QT4_NO_LINK_QTMAIN`` target
 #  property to ``TRUE`` on the executable.
@@ -518,6 +519,14 @@ _qt4_find_qmake("${_QT4_QMAKE_NAMES}" QT_QMAKE_EXECUTABLE QTVERSION)
 
 if (QT_QMAKE_EXECUTABLE AND QTVERSION)
 
+  if (Qt5Core_FOUND)
+    # Qt5CoreConfig sets QT_MOC_EXECUTABLE as a non-cache variable to the Qt 5
+    # path to moc.  Unset that variable when Qt 4 and 5 are used together, so
+    # that when find_program looks for moc, it is not set to the Qt 5 version.
+    # If FindQt4 has already put the Qt 4 path in the cache, the unset()
+    # command 'unhides' the (correct) cache variable.
+    unset(QT_MOC_EXECUTABLE)
+  endif()
   if (QT_QMAKE_EXECUTABLE_LAST)
     string(COMPARE NOTEQUAL "${QT_QMAKE_EXECUTABLE_LAST}" "${QT_QMAKE_EXECUTABLE}" QT_QMAKE_CHANGED)
   endif()
@@ -1137,6 +1146,11 @@ if (QT_QMAKE_EXECUTABLE AND QTVERSION)
   _find_qt4_program(QT_QCOLLECTIONGENERATOR_EXECUTABLE Qt4::qcollectiongenerator qcollectiongenerator-qt4 qcollectiongenerator)
   _find_qt4_program(QT_DESIGNER_EXECUTABLE Qt4::designer designer-qt4 designer designer4)
   _find_qt4_program(QT_LINGUIST_EXECUTABLE Qt4::linguist linguist-qt4 linguist linguist4)
+
+  if (NOT TARGET Qt4::qmake)
+    add_executable(Qt4::qmake IMPORTED)
+    set_property(TARGET Qt4::qmake PROPERTY IMPORTED_LOCATION ${QT_QMAKE_EXECUTABLE})
+  endif()
 
   if (QT_MOC_EXECUTABLE)
      set(QT_WRAP_CPP "YES")

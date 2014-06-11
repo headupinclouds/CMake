@@ -1,8 +1,11 @@
 CMAKE_TWEAK_VERSION
 -------------------
 
-The tweak version of cmake (i.e. the 1 in X.X.X.1).
+Defined to ``0`` for compatibility with code written for older
+CMake versions that may have defined higher values.
 
-This specifies the tweak version of the CMake executable being run.
-Releases use tweak < 20000000 and development versions use the date
-format CCYYMMDD for the tweak level.
+.. note::
+
+  In CMake versions 2.8.2 through 2.8.12, this variable holds
+  the fourth version number component of the
+  :variable:`CMAKE_VERSION` variable.

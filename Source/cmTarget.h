@@ -26,8 +26,11 @@
   F(CMP0020) \
   F(CMP0021) \
   F(CMP0022) \
+  F(CMP0027) \
+  F(CMP0038) \
   F(CMP0041) \
-  F(CMP0042)
+  F(CMP0042) \
+  F(CMP0046)
 
 class cmake;
 class cmMakefile;
@@ -254,7 +257,7 @@ public:
   void SetProperty(const char *prop, const char *value);
   void AppendProperty(const char* prop, const char* value,bool asString=false);
   const char *GetProperty(const char *prop) const;
-  const char *GetProperty(const char *prop, cmProperty::ScopeType scope) const;
+  const char *GetProperty(const char *prop, cmMakefile* context) const;
   bool GetPropertyAsBool(const char *prop) const;
   void CheckProperty(const char* prop, cmMakefile* context) const;
 
@@ -577,7 +580,7 @@ public:
                             const std::string &compatibilityType) const;
 
 private:
-  bool HandleLocationPropertyPolicy() const;
+  bool HandleLocationPropertyPolicy(cmMakefile* context) const;
 
   // The set of include directories that are marked as system include
   // directories.

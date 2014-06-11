@@ -759,7 +759,8 @@ void cmGlobalGenerator::CheckCompilerIdCompatibility(cmMakefile* mf,
     switch(mf->GetPolicyStatus(cmPolicies::CMP0025))
       {
       case cmPolicies::WARN:
-        if(!this->CMakeInstance->GetIsInTryCompile())
+        if(!this->CMakeInstance->GetIsInTryCompile() &&
+           mf->PolicyOptionalWarningEnabled("CMAKE_POLICY_WARNING_CMP0025"))
           {
           cmOStringStream w;
           w << policies->GetPolicyWarning(cmPolicies::CMP0025) << "\n"
@@ -790,7 +791,8 @@ void cmGlobalGenerator::CheckCompilerIdCompatibility(cmMakefile* mf,
     switch(mf->GetPolicyStatus(cmPolicies::CMP0047))
       {
       case cmPolicies::WARN:
-        if(!this->CMakeInstance->GetIsInTryCompile())
+        if(!this->CMakeInstance->GetIsInTryCompile() &&
+           mf->PolicyOptionalWarningEnabled("CMAKE_POLICY_WARNING_CMP0047"))
           {
           cmOStringStream w;
           w << policies->GetPolicyWarning(cmPolicies::CMP0047) << "\n"
@@ -1468,7 +1470,8 @@ void cmGlobalGenerator::ComputeGeneratorTargetObjects()
     for(cmGeneratorTargetsType::iterator ti = targets.begin();
         ti != targets.end(); ++ti)
       {
-      if (ti->second->Target->IsImported())
+      if (ti->second->Target->IsImported()
+          || ti->second->Target->GetType() == cmTarget::INTERFACE_LIBRARY)
         {
         continue;
         }
@@ -2911,7 +2914,6 @@ void cmGlobalGenerator::WriteSummary()
   cmGeneratedFileStream fout(fname.c_str());
 
   // Generate summary information files for each target.
-  std::string dir;
   for(std::map<cmStdString,cmTarget *>::const_iterator ti =
         this->TotalTargets.begin(); ti != this->TotalTargets.end(); ++ti)
     {
@@ -3031,4 +3033,11 @@ void cmGlobalGenerator::ProcessEvaluationFiles()
         }
       }
     }
+}
+
+//----------------------------------------------------------------------------
+std::string cmGlobalGenerator::ExpandCFGIntDir(const std::string& str,
+                            const std::string& /*config*/) const
+{
+  return str;
 }
