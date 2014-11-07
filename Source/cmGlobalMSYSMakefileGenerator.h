@@ -28,9 +28,9 @@ public:
       <cmGlobalMSYSMakefileGenerator>(); }
 
   ///! Get the name for the generator.
-  virtual const char* GetName() const {
+  virtual std::string GetName() const {
     return cmGlobalMSYSMakefileGenerator::GetActualName();}
-  static const char* GetActualName() {return "MSYS Makefiles";}
+  static std::string GetActualName() {return "MSYS Makefiles";}
 
   /** Get the documentation entry for this generator.  */
   static void GetDocumentation(cmDocumentationEntry& entry);
@@ -39,7 +39,7 @@ public:
   virtual cmLocalGenerator *CreateLocalGenerator();
 
   /**
-   * Try to determine system infomation such as shared library
+   * Try to determine system information such as shared library
    * extension, pthreads, byte order etc.
    */
   virtual void EnableLanguage(std::vector<std::string>const& languages,

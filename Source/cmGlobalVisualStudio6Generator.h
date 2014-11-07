@@ -31,9 +31,9 @@ public:
       <cmGlobalVisualStudio6Generator>(); }
 
   ///! Get the name for the generator.
-  virtual const char* GetName() const {
+  virtual std::string GetName() const {
     return cmGlobalVisualStudio6Generator::GetActualName();}
-  static const char* GetActualName() {return "Visual Studio 6";}
+  static std::string GetActualName() {return "Visual Studio 6";}
 
   /** Get the documentation entry for this generator.  */
   static void GetDocumentation(cmDocumentationEntry& entry);
@@ -42,7 +42,7 @@ public:
   virtual cmLocalGenerator *CreateLocalGenerator();
 
   /**
-   * Try to determine system infomation such as shared library
+   * Try to determine system information such as shared library
    * extension, pthreads, byte order etc.
    */
   virtual void EnableLanguage(std::vector<std::string>const& languages,
@@ -54,21 +54,14 @@ public:
    */
   virtual void GenerateBuildCommand(
     std::vector<std::string>& makeCommand,
-    const char* makeProgram,
-    const char* projectName,
-    const char* projectDir,
-    const char* targetName,
-    const char* config,
+    const std::string& makeProgram,
+    const std::string& projectName,
+    const std::string& projectDir,
+    const std::string& targetName,
+    const std::string& config,
     bool fast,
     std::vector<std::string> const& makeOptions = std::vector<std::string>()
     );
-
-  /**
-   * Generate the all required files for building this project/tree. This
-   * basically creates a series of LocalGenerators for each directory and
-   * requests that they Generate.
-   */
-  virtual void Generate();
 
   /**
    * Generate the DSW workspace file.
@@ -81,9 +74,9 @@ public:
                             std::vector<cmLocalGenerator*>& generators);
 
   /** Append the subdirectory for the given configuration.  */
-  virtual void AppendDirectoryForConfig(const char* prefix,
-                                        const char* config,
-                                        const char* suffix,
+  virtual void AppendDirectoryForConfig(const std::string& prefix,
+                                        const std::string& config,
+                                        const std::string& suffix,
                                         std::string& dir);
 
   ///! What is the configurations directory variable called?
@@ -91,7 +84,10 @@ public:
 
   virtual void FindMakeProgram(cmMakefile*);
 
+  virtual bool IsForVS6() const { return true; }
+
 protected:
+  virtual void Generate();
   virtual const char* GetIDEVersion() { return "6.0"; }
 private:
   virtual std::string GetVSMakeProgram() { return this->GetMSDevCommand(); }
@@ -99,10 +95,11 @@ private:
   void WriteDSWFile(std::ostream& fout);
   void WriteDSWHeader(std::ostream& fout);
   void WriteProject(std::ostream& fout,
-                    const char* name, const char* path, cmTarget const& t);
+                    const std::string& name, const char* path,
+                    cmTarget const& t);
   void WriteExternalProject(std::ostream& fout,
-                            const char* name, const char* path,
-                            const std::set<cmStdString>& dependencies);
+                            const std::string& name, const char* path,
+                            const std::set<std::string>& dependencies);
   void WriteDSWFooter(std::ostream& fout);
   virtual std::string WriteUtilityDepend(cmTarget const* target);
   std::string MSDevCommand;

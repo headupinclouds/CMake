@@ -232,6 +232,7 @@ CMAKE_CXX_SOURCES="\
   cmCommandArgumentLexer \
   cmCommandArgumentParser \
   cmCommandArgumentParserHelper \
+  cmCPackPropertiesGenerator \
   cmDefinitions \
   cmDepends \
   cmDependsC \
@@ -258,6 +259,7 @@ CMAKE_CXX_SOURCES="\
   cmGeneratorExpression \
   cmGlobalGenerator \
   cmLocalGenerator \
+  cmInstalledFile \
   cmInstallGenerator \
   cmInstallExportGenerator \
   cmInstallFilesGenerator \
@@ -329,6 +331,7 @@ fi
 KWSYS_CXX_SOURCES="\
   Directory \
   EncodingCXX \
+  FStream \
   Glob \
   RegularExpression \
   SystemTools"

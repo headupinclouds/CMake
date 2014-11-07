@@ -39,7 +39,8 @@ cmRST::cmRST(std::ostream& os, std::string const& docroot):
   ModuleRST("^#\\[(=*)\\[\\.rst:$"),
   CMakeRole("(:cmake)?:("
             "command|generator|variable|module|policy|"
-            "prop_cache|prop_dir|prop_gbl|prop_sf|prop_test|prop_tgt|"
+            "prop_cache|prop_dir|prop_gbl|prop_inst|prop_sf|"
+            "prop_test|prop_tgt|"
             "manual"
             "):`(<*([^`<]|[^` \t]<)*)([ \t]+<[^`]*>)?`"),
   Substitution("(^|[^A-Za-z0-9_])"
@@ -326,11 +327,11 @@ std::string cmRST::ReplaceSubstitutions(std::string const& line)
     std::string::size_type start = this->Substitution.start(2);
     std::string::size_type end = this->Substitution.end(2);
     std::string substitute = this->Substitution.match(3);
-    std::map<cmStdString, cmStdString>::iterator
+    std::map<std::string, std::string>::iterator
       replace = this->Replace.find(substitute);
     if(replace != this->Replace.end())
       {
-      std::pair<std::set<cmStdString>::iterator, bool> replaced =
+      std::pair<std::set<std::string>::iterator, bool> replaced =
         this->Replaced.insert(substitute);
       if(replaced.second)
         {

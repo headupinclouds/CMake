@@ -19,11 +19,6 @@ SET(OPERATING_SYSTEM "${CMAKE_SYSTEM_NAME}")
 SET(CMAKE_C_FLAGS "${CMAKE_ANSI_CFLAGS} ${CMAKE_C_FLAGS}")
 SET(CMAKE_REQUIRED_FLAGS ${CMAKE_ANSI_CFLAGS})
 
-# Disable warnings on Borland to avoid changing 3rd party code.
-IF(BORLAND)
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w-")
-ENDIF(BORLAND)
-
 # If we are on AIX, do the _ALL_SOURCE magic
 IF(${CMAKE_SYSTEM_NAME} MATCHES AIX)
   SET(_ALL_SOURCE 1)
@@ -171,6 +166,11 @@ CHECK_LIBRARY_EXISTS_CONCAT("winmm"  getch        HAVE_LIBWINMM)
 IF(NOT CURL_SPECIAL_LIBZ)
   CHECK_LIBRARY_EXISTS_CONCAT("z"      inflateEnd   HAVE_LIBZ)
 ENDIF(NOT CURL_SPECIAL_LIBZ)
+
+# Include the local directories before any others so that we do not end up
+# including system curl's include directory first by mistake.
+INCLUDE_DIRECTORIES(${LIBCURL_SOURCE_DIR})
+INCLUDE_DIRECTORIES(${LIBCURL_BINARY_DIR})
 
 OPTION(CMAKE_USE_OPENSSL "Use OpenSSL code with curl." OFF)
 MARK_AS_ADVANCED(CMAKE_USE_OPENSSL)
@@ -500,7 +500,7 @@ ENDIF(NOT HAVE_SIGSETJMP)
 
 # For other curl specific tests, use this macro.
 MACRO(CURL_INTERNAL_TEST CURL_TEST)
-  IF("${CURL_TEST}" MATCHES "^${CURL_TEST}$")
+  IF(NOT DEFINED ${CURL_TEST})
     SET(MACRO_CHECK_FUNCTION_DEFINITIONS
       "-D${CURL_TEST} ${CMAKE_REQUIRED_FLAGS}")
     IF(CMAKE_REQUIRED_LIBRARIES)
@@ -528,7 +528,7 @@ MACRO(CURL_INTERNAL_TEST CURL_TEST)
         "Performing Curl Test ${CURL_TEST} failed with the following output:\n"
         "${OUTPUT}\n")
     ENDIF(${CURL_TEST})
-  ENDIF("${CURL_TEST}" MATCHES "^${CURL_TEST}$")
+  ENDIF()
 ENDMACRO(CURL_INTERNAL_TEST)
 
 # Do curl specific tests
@@ -679,8 +679,6 @@ INCLUDE(CMake/OtherTests.cmake)
 
 # The rest of the build
 
-INCLUDE_DIRECTORIES(${LIBCURL_SOURCE_DIR})
-INCLUDE_DIRECTORIES(${LIBCURL_BINARY_DIR})
 OPTION(CMAKE_BUILD_CURL_SHARED "Should curl be built shared" TRUE)
 IF(CMAKE_BUILD_CURL_SHARED)
   SET(LIBRARY_TYPE SHARED)

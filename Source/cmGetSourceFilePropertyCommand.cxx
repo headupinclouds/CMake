@@ -29,16 +29,16 @@ bool cmGetSourceFilePropertyCommand
   // for the location we must create a source file first
   if (!sf && args[2] == "LOCATION")
     {
-    sf = this->Makefile->GetOrCreateSource(file);
+    sf = this->Makefile->CreateSource(file);
     }
   if(sf)
     {
     if(args[2] == "LANGUAGE")
       {
-      this->Makefile->AddDefinition(var, sf->GetLanguage());
+      this->Makefile->AddDefinition(var, sf->GetLanguage().c_str());
       return true;
       }
-    const char *prop = sf->GetPropertyForUser(args[2].c_str());
+    const char *prop = sf->GetPropertyForUser(args[2]);
     if (prop)
       {
       this->Makefile->AddDefinition(var, prop);

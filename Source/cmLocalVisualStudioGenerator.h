@@ -19,6 +19,7 @@
 class cmSourceFile;
 class cmSourceGroup;
 class cmCustomCommand;
+class cmCustomCommandGenerator;
 
 /** \class cmLocalVisualStudioGenerator
  * \brief Base class for Visual Studio generators.
@@ -39,16 +40,17 @@ public:
     VS9 = 90,
     VS10 = 100,
     VS11 = 110,
-    VS12 = 120
+    VS12 = 120,
+    /* VS13 = 130 was skipped */
+    VS14 = 140
   };
 
   cmLocalVisualStudioGenerator(VSVersion v);
   virtual ~cmLocalVisualStudioGenerator();
 
   /** Construct a script from the given list of command lines.  */
-  std::string ConstructScript(cmCustomCommand const& cc,
-                              const char* configName,
-                              const char* newline = "\n");
+  std::string ConstructScript(cmCustomCommandGenerator const& ccg,
+                              const std::string& newline = "\n");
 
   /** Label to which to jump in a batch file after a failed step in a
       sequence of custom commands. */
@@ -61,13 +63,18 @@ public:
 
   virtual void AddCMakeListsRules() = 0;
 
+  virtual void ComputeObjectFilenames(
+                        std::map<cmSourceFile const*, std::string>& mapping,
+                        cmGeneratorTarget const* = 0);
+
 protected:
   virtual const char* ReportErrorLabel() const;
   virtual bool CustomCommandUseLocal() const { return false; }
 
   /** Construct a custom command to make exe import lib dir.  */
   cmsys::auto_ptr<cmCustomCommand>
-  MaybeCreateImplibDir(cmTarget& target, const char* config, bool isFortran);
+  MaybeCreateImplibDir(cmTarget& target, const std::string& config,
+                       bool isFortran);
 
   VSVersion Version;
 };

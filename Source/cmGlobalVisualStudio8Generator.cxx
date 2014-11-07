@@ -16,6 +16,7 @@
 #include "cmVisualStudioWCEPlatformParser.h"
 #include "cmake.h"
 #include "cmGeneratedFileStream.h"
+#include "cmSourceFile.h"
 
 static const char vs8generatorName[] = "Visual Studio 8 2005";
 
@@ -23,17 +24,19 @@ class cmGlobalVisualStudio8Generator::Factory
   : public cmGlobalGeneratorFactory
 {
 public:
-  virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const {
-    if(strstr(name, vs8generatorName) != name)
+  virtual cmGlobalGenerator* CreateGlobalGenerator(
+                                              const std::string& name) const {
+    if(strncmp(name.c_str(), vs8generatorName,
+               sizeof(vs8generatorName) - 1) != 0)
       {
       return 0;
       }
 
-    const char* p = name + sizeof(vs8generatorName) - 1;
+    const char* p = name.c_str() + sizeof(vs8generatorName) - 1;
     if(p[0] == '\0')
       {
       return new cmGlobalVisualStudio8Generator(
-        name, NULL, NULL);
+        name, "");
       }
 
     if(p[0] != ' ')
@@ -46,7 +49,7 @@ public:
     if(!strcmp(p, "Win64"))
       {
       return new cmGlobalVisualStudio8Generator(
-        name, "x64", "CMAKE_FORCE_WIN64");
+        name, "x64");
       }
 
     cmVisualStudioWCEPlatformParser parser(p);
@@ -57,7 +60,7 @@ public:
       }
 
     cmGlobalVisualStudio8Generator* ret = new cmGlobalVisualStudio8Generator(
-      name, p, NULL);
+      name, p);
     ret->WindowsCEVersion = parser.GetOSVersion();
     return ret;
   }
@@ -90,17 +93,11 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio8Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio8Generator::cmGlobalVisualStudio8Generator(
-  const char* name, const char* platformName,
-  const char* additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName)
   : cmGlobalVisualStudio71Generator(platformName)
 {
   this->ProjectConfigurationSectionName = "ProjectConfigurationPlatforms";
   this->Name = name;
-
-  if (additionalPlatformDefinition)
-    {
-    this->AdditionalPlatformDefinition = additionalPlatformDefinition;
-    }
 }
 
 //----------------------------------------------------------------------------
@@ -129,22 +126,51 @@ cmLocalGenerator *cmGlobalVisualStudio8Generator::CreateLocalGenerator()
 {
   cmLocalVisualStudio7Generator *lg =
     new cmLocalVisualStudio7Generator(cmLocalVisualStudioGenerator::VS8);
-  lg->SetPlatformName(this->GetPlatformName());
   lg->SetExtraFlagTable(this->GetExtraFlagTableVS8());
   lg->SetGlobalGenerator(this);
   return lg;
 }
 
 //----------------------------------------------------------------------------
+void cmGlobalVisualStudio8Generator
+::EnableLanguage(std::vector<std::string>const &  lang,
+                 cmMakefile *mf, bool optional)
+{
+  for(std::vector<std::string>::const_iterator it = lang.begin();
+      it != lang.end(); ++it)
+    {
+    if(*it == "ASM_MASM")
+      {
+      this->MasmEnabled = true;
+      }
+    }
+  this->AddPlatformDefinitions(mf);
+  cmGlobalVisualStudio7Generator::EnableLanguage(lang, mf, optional);
+}
+
+//----------------------------------------------------------------------------
 void cmGlobalVisualStudio8Generator::AddPlatformDefinitions(cmMakefile* mf)
 {
-  cmGlobalVisualStudio71Generator::AddPlatformDefinitions(mf);
-
   if(this->TargetsWindowsCE())
   {
     mf->AddDefinition("CMAKE_VS_WINCE_VERSION",
       this->WindowsCEVersion.c_str());
   }
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio8Generator::SetGeneratorPlatform(std::string const& p,
+                                                          cmMakefile* mf)
+{
+  if(this->DefaultPlatformName == "Win32")
+    {
+    this->GeneratorPlatform = p;
+    return this->cmGlobalVisualStudio7Generator::SetGeneratorPlatform("", mf);
+    }
+  else
+    {
+    return this->cmGlobalVisualStudio7Generator::SetGeneratorPlatform(p, mf);
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -314,14 +340,14 @@ bool cmGlobalVisualStudio8Generator::AddCheckTarget()
   // file as the main dependency because it would get
   // overwritten by the CreateVCProjBuildRule.
   // (this could be avoided with per-target source files)
-  const char* no_main_dependency = 0;
+  std::string no_main_dependency = "";
   if(cmSourceFile* file =
      mf->AddCustomCommandToOutput(
        stamps, listFiles,
        no_main_dependency, commandLines, "Checking Build System",
        no_working_directory, true))
     {
-    tgt->AddSourceFile(file);
+    tgt->AddSource(file->GetFullPath());
     }
   else
     {
@@ -338,7 +364,7 @@ void cmGlobalVisualStudio8Generator::Generate()
   if(this->AddCheckTarget())
     {
     // All targets depend on the build-system check target.
-    for(std::map<cmStdString,cmTarget *>::const_iterator
+    for(TargetMap::const_iterator
           ti = this->TotalTargets.begin();
         ti != this->TotalTargets.end(); ++ti)
       {
@@ -372,9 +398,9 @@ cmGlobalVisualStudio8Generator
 void
 cmGlobalVisualStudio8Generator
 ::WriteProjectConfigurations(
-  std::ostream& fout, const char* name, cmTarget::TargetType type,
+  std::ostream& fout, const std::string& name, cmTarget::TargetType type,
   const std::set<std::string>& configsPartOfDefaultBuild,
-  const char* platformMapping)
+  std::string const& platformMapping)
 {
   std::string guid = this->GetGUID(name);
   for(std::vector<std::string>::iterator i = this->Configurations.begin();
@@ -382,7 +408,8 @@ cmGlobalVisualStudio8Generator
     {
     fout << "\t\t{" << guid << "}." << *i
          << "|" << this->GetPlatformName() << ".ActiveCfg = " << *i << "|"
-         << (platformMapping ? platformMapping : this->GetPlatformName())
+         << (!platformMapping.empty()?
+             platformMapping : this->GetPlatformName())
          << "\n";
       std::set<std::string>::const_iterator
         ci = configsPartOfDefaultBuild.find(*i);
@@ -390,19 +417,28 @@ cmGlobalVisualStudio8Generator
       {
       fout << "\t\t{" << guid << "}." << *i
            << "|" << this->GetPlatformName() << ".Build.0 = " << *i << "|"
-           << (platformMapping ? platformMapping : this->GetPlatformName())
+           << (!platformMapping.empty()?
+               platformMapping : this->GetPlatformName())
            << "\n";
       }
-    bool needsDeploy = (type == cmTarget::EXECUTABLE ||
-                        type == cmTarget::SHARED_LIBRARY);
-    if(this->TargetsWindowsCE() && needsDeploy)
+    if(this->NeedsDeploy(type))
       {
       fout << "\t\t{" << guid << "}." << *i
            << "|" << this->GetPlatformName() << ".Deploy.0 = " << *i << "|"
-           << (platformMapping ? platformMapping : this->GetPlatformName())
+           << (!platformMapping.empty()?
+               platformMapping : this->GetPlatformName())
            << "\n";
       }
     }
+}
+
+//----------------------------------------------------------------------------
+bool
+cmGlobalVisualStudio8Generator::NeedsDeploy(cmTarget::TargetType type) const
+{
+  bool needsDeploy = (type == cmTarget::EXECUTABLE ||
+                      type == cmTarget::SHARED_LIBRARY);
+  return this->TargetsWindowsCE() && needsDeploy;
 }
 
 //----------------------------------------------------------------------------
@@ -415,7 +451,7 @@ bool cmGlobalVisualStudio8Generator::ComputeTargetDepends()
 
 //----------------------------------------------------------------------------
 void cmGlobalVisualStudio8Generator::WriteProjectDepends(
-  std::ostream& fout, const char*, const char*, cmTarget const& t)
+  std::ostream& fout, const std::string&, const char*, cmTarget const& t)
 {
   TargetDependSet const& unordered = this->GetTargetDirectDepends(t);
   OrderedTargetDependSet depends(unordered);
@@ -426,7 +462,7 @@ void cmGlobalVisualStudio8Generator::WriteProjectDepends(
       {
       continue;
       }
-    std::string guid = this->GetGUID((*i)->GetName());
+    std::string guid = this->GetGUID((*i)->GetName().c_str());
     fout << "\t\t{" << guid << "} = {" << guid << "}\n";
     }
 }
@@ -436,11 +472,11 @@ bool cmGlobalVisualStudio8Generator::NeedLinkLibraryDependencies(
   cmTarget& target)
 {
   // Look for utility dependencies that magically link.
-  for(std::set<cmStdString>::const_iterator ui =
+  for(std::set<std::string>::const_iterator ui =
         target.GetUtilities().begin();
       ui != target.GetUtilities().end(); ++ui)
     {
-    if(cmTarget* depTarget = this->FindTarget(0, ui->c_str()))
+    if(cmTarget* depTarget = this->FindTarget(ui->c_str()))
       {
       if(depTarget->GetType() != cmTarget::INTERFACE_LIBRARY
           && depTarget->GetProperty("EXTERNAL_MSPROJECT"))

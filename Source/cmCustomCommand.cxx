@@ -17,6 +17,7 @@
 
 //----------------------------------------------------------------------------
 cmCustomCommand::cmCustomCommand()
+  : Backtrace(NULL)
 {
   this->HaveComment = false;
   this->EscapeOldStyle = true;
@@ -33,7 +34,7 @@ cmCustomCommand::cmCustomCommand(const cmCustomCommand& r):
   WorkingDirectory(r.WorkingDirectory),
   EscapeAllowMakeVars(r.EscapeAllowMakeVars),
   EscapeOldStyle(r.EscapeOldStyle),
-  Backtrace(new cmListFileBacktrace(*r.Backtrace))
+  Backtrace(r.Backtrace)
 {
 }
 
@@ -54,11 +55,7 @@ cmCustomCommand& cmCustomCommand::operator=(cmCustomCommand const& r)
   this->EscapeAllowMakeVars = r.EscapeAllowMakeVars;
   this->EscapeOldStyle = r.EscapeOldStyle;
   this->ImplicitDepends = r.ImplicitDepends;
-
-  cmsys::auto_ptr<cmListFileBacktrace>
-    newBacktrace(new cmListFileBacktrace(*r.Backtrace));
-  delete this->Backtrace;
-  this->Backtrace = newBacktrace.release();
+  this->Backtrace = r.Backtrace;
 
   return *this;
 }
@@ -78,36 +75,25 @@ cmCustomCommand::cmCustomCommand(cmMakefile const* mf,
   WorkingDirectory(workingDirectory?workingDirectory:""),
   EscapeAllowMakeVars(false),
   EscapeOldStyle(true),
-  Backtrace(new cmListFileBacktrace)
+  Backtrace(NULL)
 {
   this->EscapeOldStyle = true;
   this->EscapeAllowMakeVars = false;
   if(mf)
     {
-    mf->GetBacktrace(*this->Backtrace);
+    this->Backtrace = mf->GetBacktrace();
     }
 }
 
 //----------------------------------------------------------------------------
 cmCustomCommand::~cmCustomCommand()
 {
-  delete this->Backtrace;
 }
 
 //----------------------------------------------------------------------------
 const std::vector<std::string>& cmCustomCommand::GetOutputs() const
 {
   return this->Outputs;
-}
-
-//----------------------------------------------------------------------------
-const char* cmCustomCommand::GetWorkingDirectory() const
-{
-  if(this->WorkingDirectory.size() == 0)
-    {
-    return 0;
-    }
-  return this->WorkingDirectory.c_str();
 }
 
 //----------------------------------------------------------------------------
@@ -176,7 +162,7 @@ void cmCustomCommand::SetEscapeAllowMakeVars(bool b)
 //----------------------------------------------------------------------------
 cmListFileBacktrace const& cmCustomCommand::GetBacktrace() const
 {
-  return *this->Backtrace;
+  return this->Backtrace;
 }
 
 //----------------------------------------------------------------------------

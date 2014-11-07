@@ -51,12 +51,12 @@ std::string cmTargetCompileOptionsCommand
 }
 
 //----------------------------------------------------------------------------
-void cmTargetCompileOptionsCommand
+bool cmTargetCompileOptionsCommand
 ::HandleDirectContent(cmTarget *tgt, const std::vector<std::string> &content,
                                    bool, bool)
 {
-  cmListFileBacktrace lfbt;
-  this->Makefile->GetBacktrace(lfbt);
+  cmListFileBacktrace lfbt = this->Makefile->GetBacktrace();
   cmValueWithOrigin entry(this->Join(content), lfbt);
   tgt->InsertCompileOption(entry);
+  return true;
 }

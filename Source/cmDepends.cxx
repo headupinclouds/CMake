@@ -47,7 +47,7 @@ bool cmDepends::Write(std::ostream &makeDepends,
   std::string srcLang = "CMAKE_DEPENDS_CHECK_";
   srcLang += this->Language;
   cmMakefile* mf = this->LocalGenerator->GetMakefile();
-  const char* srcStr = mf->GetSafeDefinition(srcLang.c_str());
+  const char* srcStr = mf->GetSafeDefinition(srcLang);
   std::vector<std::string> pairs;
   cmSystemTools::ExpandListArgument(srcStr, pairs);
 
@@ -58,12 +58,7 @@ bool cmDepends::Write(std::ostream &makeDepends,
     // Get the source and object file.
     std::string const& src = *si++;
     if(si == pairs.end()) { break; }
-    std::string obj = *si++;
-
-    // Make sure the object file is relative to the top of the build tree.
-    obj = this->LocalGenerator->Convert(obj.c_str(),
-                                        cmLocalGenerator::HOME_OUTPUT,
-                                        cmLocalGenerator::MAKEFILE);
+    std::string const& obj = *si++;
     dependencies[obj].insert(src);
     }
   for(std::map<std::string, std::set<std::string> >::const_iterator
@@ -99,7 +94,7 @@ bool cmDepends::Check(const char *makeFile, const char *internalFile,
     // Get the CWD but do not call CollapseFullPath because
     // we only need it to cd back, and the form does not matter
     oldcwd = cmSystemTools::GetCurrentWorkingDirectory(false);
-    cmSystemTools::ChangeDirectory(this->CompileDirectory.c_str());
+    cmSystemTools::ChangeDirectory(this->CompileDirectory);
     }
 
   // Check whether dependencies must be regenerated.
@@ -116,7 +111,7 @@ bool cmDepends::Check(const char *makeFile, const char *internalFile,
   // Restore working directory.
   if(oldcwd != ".")
     {
-    cmSystemTools::ChangeDirectory(oldcwd.c_str());
+    cmSystemTools::ChangeDirectory(oldcwd);
     }
 
   return okay;
@@ -297,7 +292,7 @@ bool cmDepends::CheckDependencies(std::istream& internalDepends,
 }
 
 //----------------------------------------------------------------------------
-void cmDepends::SetIncludePathFromLanguage(const char* lang)
+void cmDepends::SetIncludePathFromLanguage(const std::string& lang)
 {
   // Look for the new per "TARGET_" variant first:
   const char * includePath = 0;
@@ -305,7 +300,7 @@ void cmDepends::SetIncludePathFromLanguage(const char* lang)
   includePathVar += lang;
   includePathVar += "_TARGET_INCLUDE_PATH";
   cmMakefile* mf = this->LocalGenerator->GetMakefile();
-  includePath = mf->GetDefinition(includePathVar.c_str());
+  includePath = mf->GetDefinition(includePathVar);
   if(includePath)
     {
     cmSystemTools::ExpandListArgument(includePath, this->IncludePath);
@@ -316,7 +311,7 @@ void cmDepends::SetIncludePathFromLanguage(const char* lang)
     includePathVar = "CMAKE_";
     includePathVar += lang;
     includePathVar += "_INCLUDE_PATH";
-    includePath = mf->GetDefinition(includePathVar.c_str());
+    includePath = mf->GetDefinition(includePathVar);
     if(includePath)
       {
       cmSystemTools::ExpandListArgument(includePath, this->IncludePath);

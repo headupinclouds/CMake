@@ -53,7 +53,6 @@ public:
     VARIABLE_READ_ACCESS = 0,
     UNKNOWN_VARIABLE_READ_ACCESS,
     UNKNOWN_VARIABLE_DEFINED_ACCESS,
-    ALLOWED_UNKNOWN_VARIABLE_READ_ACCESS,
     VARIABLE_MODIFIED_ACCESS,
     VARIABLE_REMOVED_ACCESS,
     NO_ACCESS
@@ -81,7 +80,7 @@ protected:
   };
 
   typedef std::vector< Pair* > VectorOfPairs;
-  typedef std::map<cmStdString, VectorOfPairs > StringToVectorOfPairs;
+  typedef std::map<std::string, VectorOfPairs > StringToVectorOfPairs;
 
   StringToVectorOfPairs WatchMap;
 };

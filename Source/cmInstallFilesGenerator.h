@@ -28,6 +28,7 @@ public:
                           const char* file_permissions,
                           std::vector<std::string> const& configurations,
                           const char* component,
+                          MessageLevel message,
                           const char* rename,
                           bool optional = false);
   virtual ~cmInstallFilesGenerator();
@@ -35,7 +36,7 @@ public:
 protected:
   virtual void GenerateScriptActions(std::ostream& os, Indent const& indent);
   virtual void GenerateScriptForConfig(std::ostream& os,
-                                       const char* config,
+                                       const std::string& config,
                                        Indent const& indent);
   void AddFilesInstallRule(std::ostream& os, Indent const& indent,
                            std::vector<std::string> const& files);

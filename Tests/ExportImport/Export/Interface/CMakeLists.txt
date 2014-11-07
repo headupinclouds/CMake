@@ -23,7 +23,13 @@ set_property(TARGET sharedlib PROPERTY INTERFACE_COMPILE_DEFINITIONS "SHAREDLIB_
 add_library(sharediface INTERFACE)
 target_link_libraries(sharediface INTERFACE sharedlib)
 
-install(TARGETS headeronly sharediface
+add_library(use_auto_type INTERFACE)
+target_compile_features(use_auto_type INTERFACE cxx_auto_type)
+
+add_library(use_c_restrict INTERFACE)
+target_compile_features(use_c_restrict INTERFACE c_restrict)
+
+install(TARGETS headeronly sharediface use_auto_type use_c_restrict
   EXPORT expInterface
 )
 install(TARGETS sharedlib

@@ -96,11 +96,13 @@ void cmParseMumpsCoverage::InitializeMumpsFile(std::string& file)
       }
     if(found)
       {
-      // (2) If the first character found above is whitespace then continue the
-      // search for the first following non-whitespace character.
+      // (2) If the first character found above is whitespace or a period
+      // then continue the search for the first following non-whitespace
+      // character.
       if(line[i] == ' ' || line[i] == '\t')
         {
-        while(i < line.size() && (line[i] == ' ' || line[i] == '\t'))
+        while(i < line.size() && (line[i] == ' ' || line[i] == '\t'
+          || line[i] == '.'))
           {
           i++;
           }
@@ -122,7 +124,7 @@ bool cmParseMumpsCoverage::LoadPackages(const char* d)
   glob.RecurseOn();
   std::string pat = d;
   pat += "/*.m";
-  glob.FindFiles(pat.c_str());
+  glob.FindFiles(pat);
   std::vector<std::string>& files = glob.GetFiles();
   std::vector<std::string>::iterator fileIt;
   for ( fileIt = files.begin(); fileIt != files.end();
@@ -140,7 +142,7 @@ bool cmParseMumpsCoverage::LoadPackages(const char* d)
 bool cmParseMumpsCoverage::FindMumpsFile(std::string const& routine,
                                          std::string& filepath)
 {
-  std::map<cmStdString, cmStdString>::iterator i =
+  std::map<std::string, std::string>::iterator i =
     this->RoutineToDirectory.find(routine);
   if(i != this->RoutineToDirectory.end())
     {

@@ -185,7 +185,7 @@ add_executable(CustomCommand
 # here to test adding the generation rule after referencing the
 # generated source in a target.
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/generated.c
-  DEPENDS generator
+  DEPENDS $<1:generator> $<0:does_not_exist>
   COMMAND generator
   ARGS ${PROJECT_BINARY_DIR}/generated.c
   )
@@ -221,8 +221,11 @@ add_subdirectory(GeneratorInExtraDir)
 
 add_executable(tcat tcat.cxx)
 
+# Test that list expansion from a generator expression works.
+set_property(TARGET tcat PROPERTY DEPSLIST tcat gen_redirect_in.c)
+
 add_custom_command(OUTPUT gen_redirect.c
-  DEPENDS tcat gen_redirect_in.c
+  DEPENDS $<TARGET_PROPERTY:tcat,DEPSLIST>
   COMMAND tcat < ${CMAKE_CURRENT_SOURCE_DIR}/gen_redirect_in.c > gen_redirect.c
   COMMAND ${CMAKE_COMMAND} -E echo "#endif" >> gen_redirect.c
   VERBATIM
@@ -364,8 +367,8 @@ endif()
 
 foreach(arg ${CHECK_ARGS} "")
   set(ARG "${arg}")
-  string(REGEX REPLACE "\\\\" "\\\\\\\\" ARG "${ARG}")
-  string(REGEX REPLACE "\"" "\\\\\"" ARG "${ARG}")
+  string(REPLACE "\\" "\\\\" ARG "${ARG}")
+  string(REPLACE "\"" "\\\"" ARG "${ARG}")
   set(EXPECTED_ARGUMENTS
     "${EXPECTED_ARGUMENTS}  \"${ARG}\",
 ")
@@ -453,3 +456,30 @@ add_custom_target(source_in_custom_target SOURCES source_in_custom_target.cpp)
 set_property(SOURCE source_in_custom_target
   PROPERTY COMPILE_DEFINITIONS "TEST"
 )
+
+set(gen_path "${CMAKE_CURRENT_BINARY_DIR}//./foo")
+set(gen_file "${gen_path}/foo.cxx")
+
+add_custom_command(
+  OUTPUT "${gen_file}"
+  # Make sure the output directory exists before trying to write to it.
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${gen_path}"
+  COMMAND ${CMAKE_COMMAND} -E touch "${gen_file}"
+)
+
+add_library(NormOutput "${gen_file}")
+
+set(gen_path "${gen_path}/bar")
+set(gen_file "${gen_path}/bar.cxx")
+
+add_custom_command(
+  OUTPUT "${gen_path}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${gen_path}"
+)
+
+add_custom_command(
+  OUTPUT "${gen_file}"
+  DEPENDS "${gen_path}"
+  COMMAND ${CMAKE_COMMAND} -E touch "${gen_file}")
+
+add_library(NormDepends "${gen_file}")

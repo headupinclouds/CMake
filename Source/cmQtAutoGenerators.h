@@ -21,7 +21,7 @@ class cmQtAutoGenerators
 {
 public:
   cmQtAutoGenerators();
-  bool Run(const char* targetDirectory, const char *config);
+  bool Run(const std::string& targetDirectory, const std::string& config);
 
   bool InitializeAutogenTarget(cmTarget* target);
   void SetupAutoGenerateTarget(cmTarget const* target);
@@ -37,11 +37,11 @@ private:
   void SetupAutoRccTarget(cmTarget const* target);
 
   bool ReadAutogenInfoFile(cmMakefile* makefile,
-                           const char* targetDirectory,
-                           const char *config);
+                           const std::string& targetDirectory,
+                           const std::string& config);
   bool ReadOldMocDefinitionsFile(cmMakefile* makefile,
-                                 const char* targetDirectory);
-  void WriteOldMocDefinitionsFile(const char* targetDirectory);
+                                 const std::string& targetDirectory);
+  void WriteOldMocDefinitionsFile(const std::string& targetDirectory);
 
   std::string MakeCompileSettingsString(cmMakefile* makefile);
 
@@ -51,28 +51,28 @@ private:
   bool GenerateUi(const std::string& realName, const std::string& uiFileName);
   bool GenerateQrc();
   void ParseCppFile(const std::string& absFilename,
-                    const std::vector<std::string>& headerExtensions,
-                    std::map<std::string, std::string>& includedMocs,
-                          std::map<std::string, std::string>& includedUis);
+              const std::vector<std::string>& headerExtensions,
+              std::map<std::string, std::string>& includedMocs,
+              std::map<std::string, std::vector<std::string> >& includedUis);
   void StrictParseCppFile(const std::string& absFilename,
-                          const std::vector<std::string>& headerExtensions,
-                          std::map<std::string, std::string>& includedMocs,
-                          std::map<std::string, std::string>& includedUis);
+              const std::vector<std::string>& headerExtensions,
+              std::map<std::string, std::string>& includedMocs,
+              std::map<std::string, std::vector<std::string> >& includedUis);
   void SearchHeadersForCppFile(const std::string& absFilename,
                               const std::vector<std::string>& headerExtensions,
                               std::set<std::string>& absHeaders);
 
   void ParseHeaders(const std::set<std::string>& absHeaders,
-                    const std::map<std::string, std::string>& includedMocs,
-                    std::map<std::string, std::string>& notIncludedMocs,
-                          std::map<std::string, std::string>& includedUis);
+              const std::map<std::string, std::string>& includedMocs,
+              std::map<std::string, std::string>& notIncludedMocs,
+              std::map<std::string, std::vector<std::string> >& includedUis);
 
   void ParseForUic(const std::string& fileName,
-                   const std::string& contentsString,
-                   std::map<std::string, std::string>& includedUis);
+              const std::string& contentsString,
+              std::map<std::string, std::vector<std::string> >& includedUis);
 
   void ParseForUic(const std::string& fileName,
-                   std::map<std::string, std::string>& includedUis);
+              std::map<std::string, std::vector<std::string> >& includedUis);
 
   void Init();
 
@@ -86,9 +86,20 @@ private:
   void MergeRccOptions(std::vector<std::string> &opts,
                        const std::vector<std::string> &fileOpts, bool isQt5);
 
+  std::string GetRccExecutable(cmTarget const* target);
+
+  std::string ListQt5RccInputs(cmSourceFile* sf, cmTarget const* target,
+                               std::vector<std::string>& depends);
+
+  std::string ListQt4RccInputs(cmSourceFile* sf,
+                               std::vector<std::string>& depends);
+
+  bool InputFilesNewerThanQrc(const std::string& qrcFile,
+                              const std::string& rccOutput);
+
   std::string QtMajorVersion;
   std::string Sources;
-  std::string RccSources;
+  std::vector<std::string> RccSources;
   std::string SkipMoc;
   std::string SkipUic;
   std::string Headers;
@@ -104,6 +115,7 @@ private:
   std::string ProjectBinaryDir;
   std::string ProjectSourceDir;
   std::string TargetName;
+  std::string OriginTargetName;
 
   std::string CurrentCompileSettingsStr;
   std::string OldCompileSettingsStr;
@@ -115,6 +127,7 @@ private:
   std::vector<std::string> UicTargetOptions;
   std::map<std::string, std::string> UicOptions;
   std::map<std::string, std::string> RccOptions;
+  std::map<std::string, std::vector<std::string> > RccInputs;
 
   bool Verbose;
   bool ColorOutput;

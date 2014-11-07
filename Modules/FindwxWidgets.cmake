@@ -229,13 +229,12 @@ else()
 endif()
 
 #=====================================================================
+# Determine whether unix or win32 paths should be used
 #=====================================================================
-if(WIN32 AND NOT CYGWIN AND NOT MSYS)
+if(WIN32 AND NOT CYGWIN AND NOT MSYS AND NOT CMAKE_CROSSCOMPILING)
   set(wxWidgets_FIND_STYLE "win32")
 else()
-  if(UNIX OR MSYS)
-    set(wxWidgets_FIND_STYLE "unix")
-  endif()
+  set(wxWidgets_FIND_STYLE "unix")
 endif()
 
 #=====================================================================
@@ -560,7 +559,7 @@ if(wxWidgets_FIND_STYLE STREQUAL "win32")
 
     if(WX_LIB_DIR)
       # If building shared libs, define WXUSINGDLL to use dllimport.
-      if(WX_LIB_DIR MATCHES ".*[dD][lL][lL].*")
+      if(WX_LIB_DIR MATCHES "[dD][lL][lL]")
         set(wxWidgets_DEFINITIONS WXUSINGDLL)
         DBG_MSG_V("detected SHARED/DLL tree WX_LIB_DIR=${WX_LIB_DIR}")
       endif()
@@ -668,7 +667,7 @@ else()
       if(_wx_result EQUAL 0)
         foreach(_opt_name debug static unicode universal)
           string(TOUPPER ${_opt_name} _upper_opt_name)
-          if(_wx_selected_config MATCHES ".*${_opt_name}.*")
+          if(_wx_selected_config MATCHES "${_opt_name}")
             set(wxWidgets_DEFAULT_${_upper_opt_name} ON)
           else()
             set(wxWidgets_DEFAULT_${_upper_opt_name} OFF)

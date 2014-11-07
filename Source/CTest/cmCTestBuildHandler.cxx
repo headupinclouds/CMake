@@ -36,9 +36,6 @@
 #include <math.h>
 #include <float.h>
 
-#if defined(__BORLANDC__)
-# pragma warn -8060 /* possibly incorrect assignment */
-#endif
 
 static const char* cmCTestErrorMatches[] = {
   "^[Bb]us [Ee]rror",
@@ -380,7 +377,7 @@ int cmCTestBuildHandler::ProcessHandler()
 
   // Create lists of regular expression strings for errors, error exceptions,
   // warnings and warning exceptions.
-  std::vector<cmStdString>::size_type cc;
+  std::vector<std::string>::size_type cc;
   for ( cc = 0; cmCTestErrorMatches[cc]; cc ++ )
     {
     this->CustomErrorMatches.push_back(cmCTestErrorMatches[cc]);
@@ -400,7 +397,7 @@ int cmCTestBuildHandler::ProcessHandler()
     }
 
   // Pre-compile regular expressions objects for all regular expressions
-  std::vector<cmStdString>::iterator it;
+  std::vector<std::string>::iterator it;
 
 #define cmCTestBuildHandlerPopulateRegexVector(strings, regexes) \
   regexes.clear(); \
@@ -409,7 +406,7 @@ int cmCTestBuildHandler::ProcessHandler()
   for ( it = strings.begin(); it != strings.end(); ++it ) \
     { \
     cmCTestLog(this->CTest, DEBUG, "Add " #strings ": " \
-    << it->c_str() << std::endl); \
+    << *it << std::endl); \
     regexes.push_back(it->c_str()); \
     }
   cmCTestBuildHandlerPopulateRegexVector(
@@ -602,23 +599,28 @@ void cmCTestBuildHandler::GenerateXMLLaunched(std::ostream& os)
   // Sort XML fragments in chronological order.
   cmFileTimeComparison ftc;
   FragmentCompare fragmentCompare(&ftc);
-  typedef std::set<cmStdString, FragmentCompare> Fragments;
+  typedef std::set<std::string, FragmentCompare> Fragments;
   Fragments fragments(fragmentCompare);
 
+  // only report the first 50 warnings and first 50 errors
+  int numErrorsAllowed = this->MaxErrors;
+  int numWarningsAllowed = this->MaxWarnings;
   // Identify fragments on disk.
   cmsys::Directory launchDir;
-  launchDir.Load(this->CTestLaunchDir.c_str());
+  launchDir.Load(this->CTestLaunchDir);
   unsigned long n = launchDir.GetNumberOfFiles();
   for(unsigned long i=0; i < n; ++i)
     {
     const char* fname = launchDir.GetFile(i);
-    if(this->IsLaunchedErrorFile(fname))
+    if(this->IsLaunchedErrorFile(fname) && numErrorsAllowed)
       {
+      numErrorsAllowed--;
       fragments.insert(this->CTestLaunchDir + "/" + fname);
       ++this->TotalErrors;
       }
-    else if(this->IsLaunchedWarningFile(fname))
+    else if(this->IsLaunchedWarningFile(fname) && numWarningsAllowed)
       {
+      numWarningsAllowed--;
       fragments.insert(this->CTestLaunchDir + "/" + fname);
       ++this->TotalWarnings;
       }
@@ -644,7 +646,7 @@ void cmCTestBuildHandler::GenerateXMLLogScraped(std::ostream& os)
   std::string srcdir = this->CTest->GetCTestConfiguration("SourceDirectory");
   // make sure the source dir is in the correct case on windows
   // via a call to collapse full path.
-  srcdir = cmSystemTools::CollapseFullPath(srcdir.c_str());
+  srcdir = cmSystemTools::CollapseFullPath(srcdir);
   srcdir += "/";
   for ( it = ew.begin();
         it != ew.end() && (numErrorsAllowed || numWarningsAllowed); it++ )
@@ -690,7 +692,7 @@ void cmCTestBuildHandler::GenerateXMLLogScraped(std::ostream& os)
             {
             // make sure it is a full path with the correct case
             cm->SourceFile = cmSystemTools::CollapseFullPath(
-              cm->SourceFile.c_str());
+              cm->SourceFile);
             cmSystemTools::ReplaceString(
               cm->SourceFile, srcdir.c_str(), "");
             }
@@ -817,7 +819,7 @@ cmCTestBuildHandler::LaunchHelper::LaunchHelper(cmCTestBuildHandler* handler):
     launchDir += "/Build";
 
     // Clean out any existing launcher fragments.
-    cmSystemTools::RemoveADirectory(launchDir.c_str());
+    cmSystemTools::RemoveADirectory(launchDir);
 
     if(this->Handler->UseCTestLaunch)
       {
@@ -889,7 +891,7 @@ int cmCTestBuildHandler::RunMakeCommand(const char* command,
   int* retVal, const char* dir, int timeout, std::ostream& ofs)
 {
   // First generate the command and arguments
-  std::vector<cmStdString> args = cmSystemTools::ParseArguments(command);
+  std::vector<std::string> args = cmSystemTools::ParseArguments(command);
 
   if(args.size() < 1)
     {
@@ -897,7 +899,7 @@ int cmCTestBuildHandler::RunMakeCommand(const char* command,
     }
 
   std::vector<const char*> argv;
-  for(std::vector<cmStdString>::const_iterator a = args.begin();
+  for(std::vector<std::string>::const_iterator a = args.begin();
     a != args.end(); ++a)
     {
     argv.push_back(a->c_str());
@@ -1133,7 +1135,7 @@ void cmCTestBuildHandler::ProcessBuffer(const char* data, int length,
         errorwarning.PostContext = "";
 
         // Copy pre-context to report
-        std::deque<cmStdString>::iterator pcit;
+        std::deque<std::string>::iterator pcit;
         for ( pcit = this->PreContext.begin();
           pcit != this->PreContext.end();
           ++pcit )

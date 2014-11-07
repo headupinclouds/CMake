@@ -26,7 +26,7 @@
 #     ALL option is used, the translations will also be created when
 #     building the default target.
 #
-# GETTEXT_PROCESS_POT( <potfile> [ALL] [INSTALL_DESTINATION <destdir>]
+# GETTEXT_PROCESS_POT_FILE( <potfile> [ALL] [INSTALL_DESTINATION <destdir>]
 # LANGUAGES <lang1> <lang2> ...  )
 #
 # ::
@@ -71,8 +71,8 @@ if(GETTEXT_MSGMERGE_EXECUTABLE)
                   OUTPUT_VARIABLE gettext_version
                   ERROR_QUIET
                   OUTPUT_STRIP_TRAILING_WHITESPACE)
-   if (gettext_version MATCHES "^msgmerge \\(.*\\) [0-9]")
-      string(REGEX REPLACE "^msgmerge \\([^\\)]*\\) ([0-9\\.]+[^ \n]*).*" "\\1" GETTEXT_VERSION_STRING "${gettext_version}")
+   if (gettext_version MATCHES "^msgmerge \\([^\\)]*\\) ([0-9\\.]+[^ \n]*)")
+      set(GETTEXT_VERSION_STRING "${CMAKE_MATCH_1}")
    endif()
    unset(gettext_version)
 endif()

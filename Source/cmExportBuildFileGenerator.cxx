@@ -18,6 +18,7 @@
 
 //----------------------------------------------------------------------------
 cmExportBuildFileGenerator::cmExportBuildFileGenerator()
+  : Backtrace(NULL)
 {
   this->Makefile = 0;
   this->ExportSet = 0;
@@ -47,7 +48,7 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
       cmOStringStream e;
       e << "given target \"" << te->GetName() << "\" more than once.";
       this->Makefile->GetCMakeInstance()
-          ->IssueMessage(cmake::FATAL_ERROR, e.str().c_str(), this->Backtrace);
+          ->IssueMessage(cmake::FATAL_ERROR, e.str(), this->Backtrace);
       return false;
       }
     if (te->GetType() == cmTarget::INTERFACE_LIBRARY)
@@ -85,6 +86,9 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
     this->PopulateInterfaceProperty("INTERFACE_AUTOUIC_OPTIONS", te,
                                     cmGeneratorExpression::BuildInterface,
                                     properties, missingTargets);
+    this->PopulateInterfaceProperty("INTERFACE_COMPILE_FEATURES", te,
+                                    cmGeneratorExpression::BuildInterface,
+                                    properties, missingTargets);
     this->PopulateInterfaceProperty("INTERFACE_POSITION_INDEPENDENT_CODE",
                                   te, properties);
     const bool newCMP0022Behavior =
@@ -106,7 +110,7 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
         ci = this->Configurations.begin();
       ci != this->Configurations.end(); ++ci)
     {
-    this->GenerateImportConfig(os, ci->c_str(), missingTargets);
+    this->GenerateImportConfig(os, *ci, missingTargets);
     }
 
   this->GenerateMissingTargetsCheckCode(os, missingTargets);
@@ -118,8 +122,9 @@ bool cmExportBuildFileGenerator::GenerateMainFile(std::ostream& os)
 void
 cmExportBuildFileGenerator
 ::GenerateImportTargetsConfig(std::ostream& os,
-                              const char* config, std::string const& suffix,
-                            std::vector<std::string> &missingTargets)
+                              const std::string& config,
+                              std::string const& suffix,
+                              std::vector<std::string> &missingTargets)
 {
   for(std::vector<cmTarget*>::const_iterator
         tei = this->Exports.begin();
@@ -166,7 +171,8 @@ void cmExportBuildFileGenerator::SetExportSet(cmExportSet *exportSet)
 //----------------------------------------------------------------------------
 void
 cmExportBuildFileGenerator
-::SetImportLocationProperty(const char* config, std::string const& suffix,
+::SetImportLocationProperty(const std::string& config,
+                            std::string const& suffix,
                             cmTarget* target, ImportPropertyMap& properties)
 {
   // Get the makefile in which to lookup target information.
@@ -313,7 +319,7 @@ cmExportBuildFileGenerator
     << "consider using the APPEND option with multiple separate calls.";
 
   this->Makefile->GetCMakeInstance()
-      ->IssueMessage(cmake::FATAL_ERROR, e.str().c_str(), this->Backtrace);
+      ->IssueMessage(cmake::FATAL_ERROR, e.str(), this->Backtrace);
 }
 
 std::string
@@ -326,7 +332,7 @@ cmExportBuildFileGenerator::InstallNameDir(cmTarget* target,
   if(mf->IsOn("CMAKE_PLATFORM_HAS_INSTALLNAME"))
     {
     install_name_dir =
-      target->GetInstallNameDirForBuildTree(config.c_str());
+      target->GetInstallNameDirForBuildTree(config);
     }
 
   return install_name_dir;

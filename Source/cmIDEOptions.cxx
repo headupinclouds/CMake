@@ -19,6 +19,7 @@ cmIDEOptions::cmIDEOptions()
   this->DoingDefine = false;
   this->AllowDefine = true;
   this->AllowSlash = false;
+  this->DoingFollowing = 0;
   for(int i=0; i < FlagTableCount; ++i)
     {
     this->FlagTable[i] = 0;
@@ -38,6 +39,14 @@ void cmIDEOptions::HandleFlag(const char* flag)
     {
     this->DoingDefine = false;
     this->Defines.push_back(flag);
+    return;
+    }
+
+  // If the last option expected a following value, this is it.
+  if(this->DoingFollowing)
+    {
+    this->FlagMapUpdate(this->DoingFollowing, flag);
+    this->DoingFollowing = 0;
     return;
     }
 
@@ -99,40 +108,22 @@ bool cmIDEOptions::CheckFlagTable(cmIDEFlagTable const* table,
          (!(entry->special & cmIDEFlagTable::UserRequired) ||
           static_cast<int>(strlen(flag+1)) > n))
         {
-        if(entry->special & cmIDEFlagTable::UserIgnored)
-          {
-          // Ignore the user-specified value.
-          this->FlagMap[entry->IDEName] = entry->value;
-          }
-        else if(entry->special & cmIDEFlagTable::SemicolonAppendable)
-          {
-          const char *new_value = flag+1+n;
-
-          std::map<cmStdString,cmStdString>::iterator itr;
-          itr = this->FlagMap.find(entry->IDEName);
-          if(itr != this->FlagMap.end())
-            {
-            // Append to old value (if present) with semicolons;
-            itr->second += ";";
-            itr->second += new_value;
-            }
-          else
-            {
-            this->FlagMap[entry->IDEName] = new_value;
-            }
-          }
-        else
-          {
-          // Use the user-specified value.
-          this->FlagMap[entry->IDEName] = flag+1+n;
-          }
+        this->FlagMapUpdate(entry, flag+n+1);
         entry_found = true;
         }
       }
     else if(strcmp(flag+1, entry->commandFlag) == 0)
       {
-      // This flag table entry provides a fixed value.
-      this->FlagMap[entry->IDEName] = entry->value;
+      if(entry->special & cmIDEFlagTable::UserFollowing)
+        {
+        // This flag expects a value in the following argument.
+        this->DoingFollowing = entry;
+        }
+      else
+        {
+        // This flag table entry provides a fixed value.
+        this->FlagMap[entry->IDEName] = entry->value;
+        }
       entry_found = true;
       }
 
@@ -148,6 +139,26 @@ bool cmIDEOptions::CheckFlagTable(cmIDEFlagTable const* table,
     }
 
   return false;
+}
+
+//----------------------------------------------------------------------------
+void cmIDEOptions::FlagMapUpdate(cmIDEFlagTable const* entry,
+                                 const char* new_value)
+{
+  if(entry->special & cmIDEFlagTable::UserIgnored)
+    {
+    // Ignore the user-specified value.
+    this->FlagMap[entry->IDEName] = entry->value;
+    }
+  else if(entry->special & cmIDEFlagTable::SemicolonAppendable)
+    {
+    this->FlagMap[entry->IDEName].push_back(new_value);
+    }
+  else
+    {
+    // Use the user-specified value.
+    this->FlagMap[entry->IDEName] = new_value;
+    }
 }
 
 //----------------------------------------------------------------------------
@@ -178,18 +189,47 @@ void cmIDEOptions::AddFlag(const char* flag, const char* value)
 }
 
 //----------------------------------------------------------------------------
+void cmIDEOptions::AddFlag(const char* flag,
+                           std::vector<std::string> const& value)
+{
+  this->FlagMap[flag] = value;
+}
+
+//----------------------------------------------------------------------------
+void cmIDEOptions::AppendFlag(std::string const& flag,
+                              std::string const& value)
+{
+  this->FlagMap[flag].push_back(value);
+}
+
+//----------------------------------------------------------------------------
+void cmIDEOptions::AppendFlag(std::string const& flag,
+                              std::vector<std::string> const& value)
+{
+  FlagValue& fv = this->FlagMap[flag];
+  std::copy(value.begin(), value.end(), std::back_inserter(fv));
+}
+
+//----------------------------------------------------------------------------
 void cmIDEOptions::RemoveFlag(const char* flag)
 {
   this->FlagMap.erase(flag);
 }
 
 //----------------------------------------------------------------------------
+bool cmIDEOptions::HasFlag(std::string const& flag) const
+{
+  return this->FlagMap.find(flag) != this->FlagMap.end();
+}
+
+//----------------------------------------------------------------------------
 const char* cmIDEOptions::GetFlag(const char* flag)
 {
-  std::map<cmStdString, cmStdString>::iterator i = this->FlagMap.find(flag);
-  if(i != this->FlagMap.end())
+  // This method works only for single-valued flags!
+  std::map<std::string, FlagValue>::iterator i = this->FlagMap.find(flag);
+  if(i != this->FlagMap.end() && i->second.size() == 1)
     {
-    return i->second.c_str();
+    return i->second[0].c_str();
     }
   return 0;
 }

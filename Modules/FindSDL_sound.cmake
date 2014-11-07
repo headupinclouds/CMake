@@ -98,7 +98,9 @@ find_path(SDL_SOUND_INCLUDE_DIR SDL_sound.h
   HINTS
     ENV SDLSOUNDDIR
     ENV SDLDIR
-  PATH_SUFFIXES include/SDL include/SDL12 include/SDL11 include
+  PATH_SUFFIXES SDL
+                # path suffixes to search inside ENV{SDLDIR}
+                include/SDL include/SDL12 include/SDL11 include
   )
 
 find_library(SDL_SOUND_LIBRARY
@@ -181,7 +183,7 @@ if(SDL_FOUND AND SDL_SOUND_INCLUDE_DIR AND SDL_SOUND_LIBRARY)
    # in the SDL_LIBRARY string after the "-framework".
    # But if I quote the stuff in INCLUDE_DIRECTORIES, it doesn't work.
    file(WRITE ${PROJECT_BINARY_DIR}/CMakeTmp/CMakeLists.txt
-     "cmake_minimum_required(VERSION 2.8)
+     "cmake_minimum_required(VERSION ${CMAKE_VERSION})
         project(DetermineSoundLibs)
         include_directories(${SDL_INCLUDE_DIR} ${SDL_SOUND_INCLUDE_DIR})
         add_executable(DetermineSoundLibs DetermineSoundLibs.c)

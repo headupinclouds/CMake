@@ -158,7 +158,7 @@ std::string cmCTestGIT::FindTopDir()
     {
     top_dir += "/";
     top_dir += cdup;
-    top_dir = cmSystemTools::CollapseFullPath(top_dir.c_str());
+    top_dir = cmSystemTools::CollapseFullPath(top_dir);
     }
   return top_dir;
 }
@@ -179,8 +179,8 @@ bool cmCTestGIT::UpdateByFetchAndReset()
     {
     opts = this->CTest->GetCTestConfiguration("GITUpdateOptions");
     }
-  std::vector<cmStdString> args = cmSystemTools::ParseArguments(opts.c_str());
-  for(std::vector<cmStdString>::const_iterator ai = args.begin();
+  std::vector<std::string> args = cmSystemTools::ParseArguments(opts.c_str());
+  for(std::vector<std::string>::const_iterator ai = args.begin();
       ai != args.end(); ++ai)
     {
     git_fetch.push_back(ai->c_str());

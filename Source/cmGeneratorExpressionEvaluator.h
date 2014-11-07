@@ -22,18 +22,27 @@ class cmTarget;
 //----------------------------------------------------------------------------
 struct cmGeneratorExpressionContext
 {
+  cmGeneratorExpressionContext()
+    : Backtrace(NULL)
+  {
+  }
+
   cmListFileBacktrace Backtrace;
   std::set<cmTarget*> DependTargets;
   std::set<cmTarget const*> AllTargets;
-  std::set<cmStdString> SeenTargetProperties;
+  std::set<std::string> SeenTargetProperties;
+  std::map<cmTarget const*, std::map<std::string, std::string> >
+                                                          MaxLanguageStandard;
   cmMakefile *Makefile;
-  const char *Config;
+  std::string Config;
   cmTarget const* HeadTarget; // The target whose property is being evaluated.
   cmTarget const* CurrentTarget; // The dependent of HeadTarget which appears
                                  // directly or indirectly in the property.
   bool Quiet;
   bool HadError;
   bool HadContextSensitiveCondition;
+  bool HadHeadSensitiveCondition;
+  bool EvaluateForBuildsystem;
 };
 
 struct cmGeneratorExpressionDAGChecker;

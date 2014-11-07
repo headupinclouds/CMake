@@ -20,11 +20,11 @@ class cmGlobalVisualStudio11Generator:
   public cmGlobalVisualStudio10Generator
 {
 public:
-  cmGlobalVisualStudio11Generator(const char* name,
-    const char* platformName, const char* additionalPlatformDefinition);
+  cmGlobalVisualStudio11Generator(const std::string& name,
+    const std::string& platformName);
   static cmGlobalGeneratorFactory* NewFactory();
 
-  virtual bool MatchesGeneratorName(const char* name) const;
+  virtual bool MatchesGeneratorName(const std::string& name) const;
 
   virtual void WriteSLNHeader(std::ostream& fout);
 
@@ -34,9 +34,16 @@ public:
   /** TODO: VS 11 user macro support. */
   virtual std::string GetUserMacrosDirectory() { return ""; }
 protected:
+  virtual bool InitializeWindowsPhone(cmMakefile* mf);
+  virtual bool InitializeWindowsStore(cmMakefile* mf);
+  virtual std::string SelectWindowsPhoneToolset() const;
+  virtual std::string SelectWindowsStoreToolset() const;
   virtual const char* GetIDEVersion() { return "11.0"; }
   bool UseFolderProperty();
   static std::set<std::string> GetInstalledWindowsCESDKs();
+
+  /** Return true if the configuration needs to be deployed */
+  virtual bool NeedsDeploy(cmTarget::TargetType type) const;
 private:
   class Factory;
   friend class Factory;

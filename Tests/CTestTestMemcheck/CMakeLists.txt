@@ -19,14 +19,6 @@ add_executable(pseudo_valgrind "${CMAKE_CURRENT_BINARY_DIR}/ret0.cxx")
 set_target_properties(pseudo_valgrind PROPERTIES OUTPUT_NAME valgrind)
 target_link_libraries(pseudo_valgrind CMakeLib)
 
-# Xcode 2.x forgets to create the output directory before linking
-# the individual architectures.
-if(CMAKE_OSX_ARCHITECTURES AND XCODE AND NOT "${XCODE_VERSION}" MATCHES "^[^12]")
-    add_custom_command(TARGET pseudo_valgrind
-                       PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CFG_INTDIR}"
-    )
-endif()
-
 add_executable(pseudo_purify "${CMAKE_CURRENT_BINARY_DIR}/ret0.cxx")
 set_target_properties(pseudo_purify PROPERTIES OUTPUT_NAME purify)
 target_link_libraries(pseudo_purify CMakeLib)
@@ -111,6 +103,90 @@ unset(CTEST_EXTRA_CONFIG)
 unset(CTEST_EXTRA_CODE)
 unset(CMAKELISTS_EXTRA_CODE)
 
+#-----------------------------------------------------------------------------
+# add ThreadSanitizer test
+set(CTEST_EXTRA_CODE
+"set(CTEST_MEMORYCHECK_COMMAND_OPTIONS \"report_bugs=1 history_size=5 exitcode=55\")
+")
+set(CMAKELISTS_EXTRA_CODE
+"add_test(NAME TestSan COMMAND \"${CMAKE_COMMAND}\"
+-P \"${CMAKE_CURRENT_SOURCE_DIR}/testThreadSanitizer.cmake\")
+")
+gen_mc_test_internal(DummyThreadSanitizer "" -DMEMCHECK_TYPE=ThreadSanitizer)
+set_tests_properties(CTestTestMemcheckDummyThreadSanitizer PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    ".*Memory checking results:.*data race.* - 1.*data race on vptr .ctor/dtor vs virtual call. - 1.*heap-use-after-free - 1.*thread leak - 1.*destroy of a locked mutex - 1.*double lock of a mutex - 1.*unlock of an unlocked mutex .or by a wrong thread. - 1.*read lock of a write locked mutex - 1.*read unlock of a write locked mutex - 1.*signal-unsafe call inside of a signal - 1.*signal handler spoils errno - 1.*lock-order-inversion .potential deadlock. - 1.*")
+set(CMAKELISTS_EXTRA_CODE )
+set(CTEST_EXTRA_CODE)
+
+#-----------------------------------------------------------------------------
+# add LeakSanitizer test
+set(CTEST_EXTRA_CODE
+"set(CTEST_MEMORYCHECK_SANITIZER_OPTIONS \"simulate_sanitizer=1 report_bugs=1 history_size=5 exitcode=55\")
+")
+set(CMAKELISTS_EXTRA_CODE
+"add_test(NAME TestSan COMMAND \"${CMAKE_COMMAND}\"
+-P \"${CMAKE_CURRENT_SOURCE_DIR}/testLeakSanitizer.cmake\")
+")
+gen_mc_test_internal(DummyLeakSanitizer "" -DMEMCHECK_TYPE=AddressSanitizer)
+set(CMAKELISTS_EXTRA_CODE )
+set(CTEST_EXTRA_CODE)
+set_tests_properties(CTestTestMemcheckDummyLeakSanitizer PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    ".*Memory checking results:.*Direct leak - 2.*Indirect leak - 1.*")
+
+#-----------------------------------------------------------------------------
+# add AddressSanitizer test
+set(CTEST_EXTRA_CODE
+"set(CTEST_MEMORYCHECK_SANITIZER_OPTIONS \"simulate_sanitizer=1 report_bugs=1 history_size=5 exitcode=55\")
+")
+set(CMAKELISTS_EXTRA_CODE
+"add_test(NAME TestSan COMMAND \"${CMAKE_COMMAND}\"
+-P \"${CMAKE_CURRENT_SOURCE_DIR}/testAddressSanitizer.cmake\")
+")
+gen_mc_test_internal(DummyAddressSanitizer "" -DMEMCHECK_TYPE=AddressSanitizer)
+set(CMAKELISTS_EXTRA_CODE )
+set(CTEST_EXTRA_CODE)
+set_tests_properties(CTestTestMemcheckDummyAddressSanitizer PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    ".*Memory checking results:.*heap-buffer-overflow - 1.*")
+
+#-----------------------------------------------------------------------------
+# add MemorySanitizer test
+set(CTEST_EXTRA_CODE
+"set(CTEST_MEMORYCHECK_COMMAND_OPTIONS \"simulate_sanitizer=1 report_bugs=1 history_size=5 exitcode=55\")
+")
+
+set(CMAKELISTS_EXTRA_CODE
+"add_test(NAME TestSan COMMAND \"${CMAKE_COMMAND}\"
+-P \"${CMAKE_CURRENT_SOURCE_DIR}/testMemorySanitizer.cmake\")
+")
+gen_mc_test_internal(DummyMemorySanitizer "" -DMEMCHECK_TYPE=MemorySanitizer)
+set(CMAKELISTS_EXTRA_CODE )
+set(CTEST_EXTRA_CODE)
+set_tests_properties(CTestTestMemcheckDummyMemorySanitizer PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    ".*Memory checking results:.*use-of-uninitialized-value - 1.*")
+
+#-----------------------------------------------------------------------------
+# add UndefinedBehaviorSanitizer test
+set(CTEST_EXTRA_CODE
+"set(CTEST_MEMORYCHECK_SANITIZER_OPTIONS \"simulate_sanitizer=1\")
+")
+
+set(CMAKELISTS_EXTRA_CODE
+"add_test(NAME TestSan COMMAND \"${CMAKE_COMMAND}\"
+-P \"${CMAKE_CURRENT_SOURCE_DIR}/testUndefinedBehaviorSanitizer.cmake\")
+")
+gen_mc_test_internal(DummyUndefinedBehaviorSanitizer "" -DMEMCHECK_TYPE=UndefinedBehaviorSanitizer)
+set(CMAKELISTS_EXTRA_CODE )
+set(CTEST_EXTRA_CODE)
+set_tests_properties(CTestTestMemcheckDummyUndefinedBehaviorSanitizer PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    ".*Memory checking results:.*left shift of negative value -256 - 1.*")
+
+#-----------------------------------------------------------------------------
+
 gen_mc_test(DummyPurify "\${PSEUDO_PURIFY}")
 gen_mc_test(DummyValgrind "\${PSEUDO_VALGRIND}")
 gen_mc_test(DummyBC "\${PSEUDO_BC}")
@@ -185,7 +261,7 @@ set_tests_properties(CTestTestMemcheckDummyValgrindIgnoreMemcheck
     PASS_REGULAR_EXPRESSION "\n2/2 Test #2: RunCMakeAgain .*${ctest_and_tool_outputs}$")
 
 set_tests_properties(CTestTestMemcheckDummyBC PROPERTIES
-    PASS_REGULAR_EXPRESSION "\n1/1 MemCheck #1: RunCMake \\.+   Passed +[0-9]+.[0-9]+ sec\n\n100% tests passed, 0 tests failed out of 1\n(.*\n)?Error parsing XML in stream at line 1: no element found\n")
+    PASS_REGULAR_EXPRESSION "\n1/1 MemCheck #1: RunCMake \\.+   Passed +[0-9]+.[0-9]+ sec\n${guard_malloc_lines}\n100% tests passed, 0 tests failed out of 1\n(.*\n)?Error parsing XML in stream at line 1: no element found\n")
 
 set_tests_properties(CTestTestMemcheckDummyValgrindInvalidSupFile PROPERTIES
     PASS_REGULAR_EXPRESSION "\nCannot find memory checker suppression file: ${CTEST_ESCAPED_REALPATH_CMAKE_CURRENT_BINARY_DIR}/does-not-exist\n")
@@ -196,3 +272,19 @@ set_tests_properties(CTestTestMemcheckDummyValgrindCustomOptions PROPERTIES
 set_tests_properties(CTestTestMemcheckDummyValgrindTwoTargets PROPERTIES
     PASS_REGULAR_EXPRESSION
     "\nMemory check project ${CTEST_ESCAPED_CMAKE_CURRENT_BINARY_DIR}/DummyValgrindTwoTargets\n.*\n *Start 1: RunCMake\n(.*\n)?Memory check command: .* \"--log-file=${CTEST_ESCAPED_CMAKE_CURRENT_BINARY_DIR}/DummyValgrindTwoTargets/Testing/Temporary/MemoryChecker.1.log\" \"-q\".*\n *Start 2: RunCMakeAgain\n(.*\n)?Memory check command: .* \"--log-file=${CTEST_ESCAPED_CMAKE_CURRENT_BINARY_DIR}/DummyValgrindTwoTargets/Testing/Temporary/MemoryChecker.2.log\" \"-q\".*\n")
+
+
+# Xcode 2.x forgets to create the output directory before linking
+# the individual architectures.
+if(CMAKE_OSX_ARCHITECTURES AND XCODE AND NOT "${XCODE_VERSION}" MATCHES "^[^12]")
+  foreach(t
+      memcheck_fail
+      pseudo_BC
+      pseudo_purify
+      pseudo_valgrind
+      )
+    add_custom_command(TARGET ${t}
+      PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CFG_INTDIR}"
+      )
+  endforeach()
+endif()

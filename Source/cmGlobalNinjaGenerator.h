@@ -173,17 +173,14 @@ public:
   virtual cmLocalGenerator* CreateLocalGenerator();
 
   /// Overloaded methods. @see cmGlobalGenerator::GetName().
-  virtual const char* GetName() const {
+  virtual std::string GetName() const {
     return cmGlobalNinjaGenerator::GetActualName(); }
 
   /// @return the name of this generator.
-  static const char* GetActualName() { return "Ninja"; }
+  static std::string GetActualName() { return "Ninja"; }
 
   /// Overloaded methods. @see cmGlobalGenerator::GetDocumentation()
   static void GetDocumentation(cmDocumentationEntry& entry);
-
-  /// Overloaded methods. @see cmGlobalGenerator::Generate()
-  virtual void Generate();
 
   /// Overloaded methods. @see cmGlobalGenerator::EnableLanguage()
   virtual void EnableLanguage(std::vector<std::string>const& languages,
@@ -193,11 +190,11 @@ public:
   /// Overloaded methods. @see cmGlobalGenerator::GenerateBuildCommand()
   virtual void GenerateBuildCommand(
     std::vector<std::string>& makeCommand,
-    const char* makeProgram,
-    const char* projectName,
-    const char* projectDir,
-    const char* targetName,
-    const char* config,
+    const std::string& makeProgram,
+    const std::string& projectName,
+    const std::string& projectDir,
+    const std::string& targetName,
+    const std::string& config,
     bool fast,
     std::vector<std::string> const& makeOptions = std::vector<std::string>()
     );
@@ -299,8 +296,13 @@ public:
 
   void AddTargetAlias(const std::string& alias, cmTarget* target);
 
+  virtual void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const;
 
+  std::string ninjaVersion() const;
 protected:
+
+  /// Overloaded methods. @see cmGlobalGenerator::Generate()
+  virtual void Generate();
 
   /// Overloaded methods.
   /// @see cmGlobalGenerator::CheckALLOW_DUPLICATE_CUSTOM_TARGETS()
@@ -310,8 +312,6 @@ protected:
 private:
   virtual std::string GetEditCacheCommand() const;
 
-  /// @see cmGlobalGenerator::ComputeTargetObjects
-  virtual void ComputeTargetObjects(cmGeneratorTarget* gt) const;
 
   void OpenBuildFileStream();
   void CloseBuildFileStream();
@@ -337,8 +337,7 @@ private:
 
   std::string ninjaCmd() const;
 
-
-  /// The file containing the build statement. (the relation ship of the
+  /// The file containing the build statement. (the relationship of the
   /// compilation DAG).
   cmGeneratedFileStream* BuildFileStream;
   /// The file containing the rule statements. (The action attached to each
@@ -365,10 +364,11 @@ private:
   /// The set of custom command outputs we have seen.
   std::set<std::string> CustomCommandOutputs;
 
-  //The combined explicit dependencies of all build commands that the global
-  //generator has issued. When combined with CombinedBuildOutputs it allows
-  //us to detect the set of explicit dependencies that have
-  std::set<std::string> CombinedBuildExplicitDependencies;
+  /// The combined explicit dependencies of custom build commands
+  std::set<std::string> CombinedCustomCommandExplicitDependencies;
+
+  /// When combined with CombinedCustomCommandExplicitDependencies it allows
+  /// us to detect the set of explicit dependencies that have
   std::set<std::string> CombinedBuildOutputs;
 
   /// The mapping from source file to assumed dependencies.

@@ -16,13 +16,14 @@
 static const char vs11generatorName[] = "Visual Studio 11 2012";
 
 // Map generator name without year to name with year.
-static const char* cmVS11GenName(const char* name, std::string& genName)
+static const char* cmVS11GenName(const std::string& name, std::string& genName)
 {
-  if(strncmp(name, vs11generatorName, sizeof(vs11generatorName)-6) != 0)
+  if(strncmp(name.c_str(), vs11generatorName,
+             sizeof(vs11generatorName)-6) != 0)
     {
     return 0;
     }
-  const char* p = name + sizeof(vs11generatorName) - 6;
+  const char* p = name.c_str() + sizeof(vs11generatorName) - 6;
   if(cmHasLiteralPrefix(p, " 2012"))
     {
     p += 5;
@@ -35,32 +36,29 @@ class cmGlobalVisualStudio11Generator::Factory
   : public cmGlobalGeneratorFactory
 {
 public:
-  virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const
+  virtual cmGlobalGenerator* CreateGlobalGenerator(
+                                                const std::string& name) const
     {
     std::string genName;
     const char* p = cmVS11GenName(name, genName);
     if(!p)
       { return 0; }
-    name = genName.c_str();
-    if(strcmp(p, "") == 0)
+    if(!*p)
       {
       return new cmGlobalVisualStudio11Generator(
-        name, NULL, NULL);
+        genName, "");
       }
-    if(strcmp(p, " Win64") == 0)
-      {
-      return new cmGlobalVisualStudio11Generator(
-        name, "x64", "CMAKE_FORCE_WIN64");
-      }
-    if(strcmp(p, " ARM") == 0)
-      {
-      return new cmGlobalVisualStudio11Generator(
-        name, "ARM", NULL);
-      }
-
     if(*p++ != ' ')
+      { return 0; }
+    if(strcmp(p, "Win64") == 0)
       {
-      return 0;
+      return new cmGlobalVisualStudio11Generator(
+        genName, "x64");
+      }
+    if(strcmp(p, "ARM") == 0)
+      {
+      return new cmGlobalVisualStudio11Generator(
+        genName, "ARM");
       }
 
     std::set<std::string> installedSDKs =
@@ -72,7 +70,7 @@ public:
       }
 
     cmGlobalVisualStudio11Generator* ret =
-      new cmGlobalVisualStudio11Generator(name, p, NULL);
+      new cmGlobalVisualStudio11Generator(name, p);
     ret->WindowsCEVersion = "8.00";
     return ret;
     }
@@ -107,21 +105,20 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio11Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio11Generator::cmGlobalVisualStudio11Generator(
-  const char* name, const char* platformName,
-  const char* additionalPlatformDefinition)
-  : cmGlobalVisualStudio10Generator(name, platformName,
-                                   additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName)
+  : cmGlobalVisualStudio10Generator(name, platformName)
 {
   std::string vc11Express;
   this->ExpressEdition = cmSystemTools::ReadRegistryValue(
     "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\VCExpress\\11.0\\Setup\\VC;"
     "ProductDir", vc11Express, cmSystemTools::KeyWOW64_32);
-  this->PlatformToolset = "v110";
+  this->DefaultPlatformToolset = "v110";
 }
 
 //----------------------------------------------------------------------------
 bool
-cmGlobalVisualStudio11Generator::MatchesGeneratorName(const char* name) const
+cmGlobalVisualStudio11Generator::MatchesGeneratorName(
+                                                const std::string& name) const
 {
   std::string genName;
   if(cmVS11GenName(name, genName))
@@ -129,6 +126,56 @@ cmGlobalVisualStudio11Generator::MatchesGeneratorName(const char* name) const
     return genName == this->GetName();
     }
   return false;
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio11Generator::InitializeWindowsPhone(cmMakefile* mf)
+{
+  this->DefaultPlatformToolset = this->SelectWindowsPhoneToolset();
+  if(this->DefaultPlatformToolset.empty())
+    {
+    cmOStringStream e;
+    e << this->GetName() << " supports Windows Phone '8.0', but not '"
+      << this->SystemVersion << "'.  Check CMAKE_SYSTEM_VERSION.";
+    mf->IssueMessage(cmake::FATAL_ERROR, e.str());
+    return false;
+    }
+  return true;
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio11Generator::InitializeWindowsStore(cmMakefile* mf)
+{
+  this->DefaultPlatformToolset = this->SelectWindowsStoreToolset();
+  if(this->DefaultPlatformToolset.empty())
+    {
+    cmOStringStream e;
+    e << this->GetName() << " supports Windows Store '8.0', but not '"
+      << this->SystemVersion << "'.  Check CMAKE_SYSTEM_VERSION.";
+    mf->IssueMessage(cmake::FATAL_ERROR, e.str());
+    return false;
+    }
+  return true;
+}
+
+//----------------------------------------------------------------------------
+std::string cmGlobalVisualStudio11Generator::SelectWindowsPhoneToolset() const
+{
+  if(this->SystemVersion == "8.0")
+    {
+    return "v110_wp80";
+    }
+  return this->cmGlobalVisualStudio10Generator::SelectWindowsPhoneToolset();
+}
+
+//----------------------------------------------------------------------------
+std::string cmGlobalVisualStudio11Generator::SelectWindowsStoreToolset() const
+{
+  if(this->SystemVersion == "8.0")
+    {
+    return "v110";
+    }
+  return this->cmGlobalVisualStudio10Generator::SelectWindowsStoreToolset();
 }
 
 //----------------------------------------------------------------------------
@@ -150,7 +197,6 @@ cmLocalGenerator *cmGlobalVisualStudio11Generator::CreateLocalGenerator()
 {
   cmLocalVisualStudio10Generator* lg =
     new cmLocalVisualStudio10Generator(cmLocalVisualStudioGenerator::VS11);
-  lg->SetPlatformName(this->GetPlatformName());
   lg->SetGlobalGenerator(this);
   return lg;
 }
@@ -195,4 +241,18 @@ cmGlobalVisualStudio11Generator::GetInstalledWindowsCESDKs()
     }
 
   return ret;
+}
+
+//----------------------------------------------------------------------------
+bool
+cmGlobalVisualStudio11Generator::NeedsDeploy(cmTarget::TargetType type) const
+{
+  if((type == cmTarget::EXECUTABLE ||
+      type == cmTarget::SHARED_LIBRARY) &&
+     (this->SystemIsWindowsPhone ||
+      this->SystemIsWindowsStore))
+    {
+    return true;
+    }
+  return cmGlobalVisualStudio10Generator::NeedsDeploy(type);
 }

@@ -35,6 +35,9 @@ String operations.
   string(FIND <string> <substring> <output variable> [REVERSE])
   string(TIMESTAMP <output variable> [<format string>] [UTC])
   string(MAKE_C_IDENTIFIER <input string> <output variable>)
+  string(GENEX_STRIP <input string> <output variable>)
+  string(UUID <output variable> NAMESPACE <namespace> NAME <name>
+         TYPE <MD5|SHA1> [UPPER])
 
 REGEX MATCH will match the regular expression once and store the match
 in the output variable.
@@ -154,3 +157,17 @@ If no explicit <format string> is given it will default to:
 
 MAKE_C_IDENTIFIER will write a string which can be used as an
 identifier in C.
+
+``GENEX_STRIP`` will strip any
+:manual:`generator expressions <cmake-generator-expressions(7)>` from the
+``input string`` and store the result in the ``output variable``.
+
+UUID creates a univerally unique identifier (aka GUID) as per RFC4122
+based on the hash of the combined values of <namespace>
+(which itself has to be a valid UUID) and <name>.
+The hash algorithm can be either ``MD5`` (Version 3 UUID) or
+``SHA1`` (Version 5 UUID).
+A UUID has the format ``xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx``
+where each `x` represents a lower case hexadecimal character.
+Where required an uppercase representation can be requested
+with the optional ``UPPER`` flag.

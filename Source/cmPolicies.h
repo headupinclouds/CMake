@@ -104,6 +104,13 @@ public:
     CMP0048, ///< project() command manages VERSION variables
     CMP0049, ///< Do not expand variables in target source entries
     CMP0050, ///< Disallow add_custom_command SOURCE signatures
+    CMP0051, ///< List TARGET_OBJECTS in SOURCES target property
+    CMP0052, ///< Reject source and build dirs in installed
+    /// INTERFACE_INCLUDE_DIRECTORIES
+
+    CMP0053, ///< Simplify variable reference and escape sequence evaluation
+    CMP0054, ///< Only interpret if() arguments as variables
+    /// or keywords when unquoted.
 
     /** \brief Always the last entry.
      *

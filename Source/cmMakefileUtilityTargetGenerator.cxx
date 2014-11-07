@@ -52,9 +52,9 @@ void cmMakefileUtilityTargetGenerator::WriteRuleFiles()
     *this->BuildFileStream
       << "# Include the progress variables for this target.\n"
       << this->LocalGenerator->IncludeDirective << " " << root
-      << this->Convert(this->ProgressFileNameFull.c_str(),
+      << this->Convert(this->ProgressFileNameFull,
                        cmLocalGenerator::HOME_OUTPUT,
-                       cmLocalGenerator::MAKEFILE)
+                       cmLocalGenerator::MAKERULE)
       << "\n\n";
     }
 

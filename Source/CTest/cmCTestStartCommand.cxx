@@ -124,14 +124,14 @@ bool cmCTestStartCommand
     {
     return false;
     }
-  if(!cmSystemTools::FileIsDirectory(sourceDir.c_str()))
+  if(!cmSystemTools::FileIsDirectory(sourceDir))
     {
     cmOStringStream e;
     e << "given source path\n"
       << "  " << sourceDir << "\n"
       << "which is not an existing directory.  "
       << "Set CTEST_CHECKOUT_COMMAND to a command line to create it.";
-    this->SetError(e.str().c_str());
+    this->SetError(e.str());
     return false;
     }
 
@@ -160,7 +160,7 @@ bool cmCTestStartCommand::InitialCheckout(
     {
     // Use a generic VC object to run and log the command.
     cmCTestVC vc(this->CTest, ofs);
-    vc.SetSourceDirectory(sourceDir.c_str());
+    vc.SetSourceDirectory(sourceDir);
     if(!vc.InitialCheckout(initialCheckoutCommand))
       {
       return false;

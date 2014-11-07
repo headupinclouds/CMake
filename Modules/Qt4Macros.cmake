@@ -65,8 +65,8 @@ macro (QT4_MAKE_OUTPUT_FILE infile prefix ext outfile )
   else()
     file(RELATIVE_PATH rel ${CMAKE_CURRENT_SOURCE_DIR} ${infile})
   endif()
-  if(WIN32 AND rel MATCHES "^[a-zA-Z]:") # absolute path
-    string(REGEX REPLACE "^([a-zA-Z]):(.*)$" "\\1_\\2" rel "${rel}")
+  if(WIN32 AND rel MATCHES "^([a-zA-Z]):(.*)$") # absolute path
+    set(rel "${CMAKE_MATCH_1}_${CMAKE_MATCH_2}")
   endif()
   set(_outfile "${CMAKE_CURRENT_BINARY_DIR}/${rel}")
   string(REPLACE ".." "__" _outfile ${_outfile})
@@ -135,13 +135,15 @@ function (QT4_CREATE_MOC_COMMAND infile outfile moc_flags moc_options moc_target
     set(targetincludes)
     set(targetdefines)
   else()
-    file(WRITE ${_moc_parameters_file} "${_moc_parameters}\n")
+    set(CMAKE_CONFIGURABLE_FILE_CONTENT "${_moc_parameters}")
+    configure_file("${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in"
+                   "${_moc_parameters_file}" @ONLY)
   endif()
 
   set(_moc_extra_parameters_file @${_moc_parameters_file})
   add_custom_command(OUTPUT ${outfile}
                       COMMAND Qt4::moc ${_moc_extra_parameters_file}
-                      DEPENDS ${infile}
+                      DEPENDS ${infile} ${_moc_parameters_file}
                       ${_moc_working_dir}
                       VERBATIM)
 endfunction ()
@@ -230,7 +232,7 @@ macro (QT4_ADD_RESOURCES outfiles )
       # let's make a configured file and add it as a dependency so cmake is run
       # again when dependencies need to be recomputed.
       QT4_MAKE_OUTPUT_FILE("${infile}" "" "qrc.depends" out_depends)
-      configure_file("${infile}" "${out_depends}" COPY_ONLY)
+      configure_file("${infile}" "${out_depends}" COPYONLY)
     else()
       # The .qrc file does not exist (yet). Let's add a dependency and hope
       # that it will be generated later

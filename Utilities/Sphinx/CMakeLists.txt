@@ -25,6 +25,7 @@ project(CMakeHelp NONE)
 option(SPHINX_MAN "Build man pages with Sphinx" OFF)
 option(SPHINX_HTML "Build html help with Sphinx" OFF)
 option(SPHINX_SINGLEHTML "Build html single page help with Sphinx" OFF)
+option(SPHINX_QTHELP "Build Qt help with Sphinx" OFF)
 option(SPHINX_TEXT "Build text help with Sphinx (not installed)" OFF)
 find_program(SPHINX_EXECUTABLE
   NAMES sphinx-build
@@ -33,7 +34,7 @@ find_program(SPHINX_EXECUTABLE
 
 mark_as_advanced(SPHINX_TEXT)
 
-if(NOT SPHINX_MAN AND NOT SPHINX_HTML AND NOT SPHINX_SINGLEHTML AND NOT SPHINX_TEXT)
+if(NOT SPHINX_MAN AND NOT SPHINX_HTML AND NOT SPHINX_SINGLEHTML AND NOT SPHINX_QTHELP AND NOT SPHINX_TEXT)
   return()
 elseif(NOT SPHINX_EXECUTABLE)
   message(FATAL_ERROR "SPHINX_EXECUTABLE (sphinx-build) is not found!")
@@ -67,6 +68,40 @@ endif()
 if(SPHINX_TEXT)
   list(APPEND doc_formats text)
 endif()
+if(SPHINX_QTHELP)
+  find_package(PythonInterp REQUIRED)
+
+  find_program(QCOLLECTIONGENERATOR_EXECUTABLE
+    NAMES qcollectiongenerator
+    DOC "qcollectiongenerator tool"
+    )
+  if (NOT QCOLLECTIONGENERATOR_EXECUTABLE)
+    message(FATAL_ERROR "QCOLLECTIONGENERATOR_EXECUTABLE (qcollectiongenerator) not found!")
+  endif()
+  list(APPEND doc_formats qthelp)
+
+  set(qthelp_extra_commands
+    # Workaround for assistant prior to
+    # https://codereview.qt-project.org/#change,82250 in Qt 4.
+    COMMAND ${CMAKE_COMMAND} "-DCSS_DIR=${CMAKE_CURRENT_BINARY_DIR}/qthelp/_static"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/apply_qthelp_css_workaround.cmake"
+    # Workaround sphinx configurability:
+    # https://bitbucket.org/birkenfeld/sphinx/issue/1448/make-qthelp-more-configurable
+    COMMAND ${CMAKE_COMMAND} "-DQTHELP_DIR=${CMAKE_CURRENT_BINARY_DIR}/qthelp/"
+      "-DCMake_VERSION=${CMake_VERSION_MAJOR}${CMake_VERSION_MINOR}${CMake_VERSION_PATCH}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/fixup_qthelp_names.cmake"
+
+    # Create proper identifiers. Workaround for
+    # https://bitbucket.org/birkenfeld/sphinx/issue/1491/qthelp-should-generate-identifiers-for
+    COMMAND "${PYTHON_EXECUTABLE}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/create_identifiers.py"
+      "${CMAKE_CURRENT_BINARY_DIR}/qthelp/"
+
+    COMMAND ${QCOLLECTIONGENERATOR_EXECUTABLE}
+      ${CMAKE_CURRENT_BINARY_DIR}/qthelp/CMake.qhcp
+  )
+endif()
+
 
 set(doc_format_outputs "")
 set(doc_format_last "")
@@ -82,6 +117,7 @@ foreach(format ${doc_formats})
             ${CMake_SOURCE_DIR}/Help
             ${CMAKE_CURRENT_BINARY_DIR}/${format}
             > ${doc_format_log} # log stdout, pass stderr
+    ${${format}_extra_commands}
     DEPENDS ${doc_format_last}
     COMMENT "sphinx-build ${format}: see Utilities/Sphinx/${doc_format_log}"
     VERBATIM
@@ -132,5 +168,11 @@ if(SPHINX_SINGLEHTML)
           DESTINATION ${CMAKE_DOC_DIR}
           PATTERN .buildinfo EXCLUDE
           PATTERN objects.inv EXCLUDE
+          )
+endif()
+
+if(SPHINX_QTHELP)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/qthelp/CMake-${CMake_VERSION_MAJOR}${CMake_VERSION_MINOR}${CMake_VERSION_PATCH}.qch
+          DESTINATION ${CMAKE_DOC_DIR}
           )
 endif()

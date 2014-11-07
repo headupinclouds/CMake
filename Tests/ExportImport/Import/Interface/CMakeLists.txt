@@ -17,6 +17,7 @@ set_property(TARGET bld::sharediface APPEND PROPERTY INTERFACE_LINK_LIBRARIES de
 add_executable(interfacetest_bld interfacetest.cpp)
 target_link_libraries(interfacetest_bld bld::sharediface)
 
+include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 
 macro(do_try_compile prefix)
@@ -40,6 +41,43 @@ macro(do_try_compile prefix)
   if(NOT ${prefix}IFACE_TRY_COMPILE)
     message(SEND_ERROR "${prefix} try_compile with IMPORTED INTERFACE target failed!\n\n${OUTPUT}")
   endif()
+
+  if (";${CMAKE_C_COMPILE_FEATURES};" MATCHES ";c_restrict;")
+    set(CMAKE_REQUIRED_LIBRARIES ${prefix}::use_c_restrict)
+    check_c_source_compiles(
+      "
+    int foo(int * restrict a, int * restrict b)
+    {
+      (void)a;
+      (void)b;
+      return 0;
+    }
+    int main()
+    {
+      return 0;
+    }
+    " ${prefix}IMPORTED_IFACE_C_RESTRICT)
+
+    if(NOT ${prefix}IMPORTED_IFACE_C_RESTRICT)
+      message(SEND_ERROR "${prefix} try_compile with IMPORTED INTERFACE target failed!\n\n${OUTPUT}")
+    endif()
+  endif()
+  if (";${CMAKE_CXX_COMPILE_FEATURES};" MATCHES ";cxx_auto_type;")
+    set(CMAKE_REQUIRED_LIBRARIES ${prefix}::use_auto_type)
+    check_cxx_source_compiles(
+      "
+    int main(int,char**)
+    {
+      auto value = 0;
+      return value;
+    }
+    " ${prefix}IMPORTED_IFACE_AUTO_TYPE)
+
+    if(NOT ${prefix}IMPORTED_IFACE_AUTO_TYPE)
+      message(SEND_ERROR "${prefix} try_compile with IMPORTED INTERFACE target failed!\n\n${OUTPUT}")
+    endif()
+  endif()
+
 endmacro()
 
 do_try_compile(bld)

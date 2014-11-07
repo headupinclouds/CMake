@@ -24,6 +24,25 @@ cmGeneratorExpressionDAGChecker::cmGeneratorExpressionDAGChecker(
   : Parent(parent), Target(target), Property(property),
     Content(content), Backtrace(backtrace), TransitivePropertiesOnly(false)
 {
+  Initialize();
+}
+
+//----------------------------------------------------------------------------
+cmGeneratorExpressionDAGChecker::cmGeneratorExpressionDAGChecker(
+                const std::string &target,
+                const std::string &property,
+                const GeneratorExpressionContent *content,
+                cmGeneratorExpressionDAGChecker *parent)
+  : Parent(parent), Target(target), Property(property),
+    Content(content), Backtrace(NULL), TransitivePropertiesOnly(false)
+{
+  Initialize();
+}
+
+//----------------------------------------------------------------------------
+void
+cmGeneratorExpressionDAGChecker::Initialize()
+{
   const cmGeneratorExpressionDAGChecker *top = this;
   const cmGeneratorExpressionDAGChecker *p = this->Parent;
   while (p)
@@ -42,12 +61,13 @@ cmGeneratorExpressionDAGChecker::cmGeneratorExpressionDAGChecker(
      )
 #undef TEST_TRANSITIVE_PROPERTY_METHOD
     {
-    std::map<cmStdString, std::set<cmStdString> >::const_iterator it
-                                                    = top->Seen.find(target);
+    std::map<std::string, std::set<std::string> >::const_iterator it
+                                              = top->Seen.find(this->Target);
     if (it != top->Seen.end())
       {
-      const std::set<cmStdString> &propSet = it->second;
-      const std::set<cmStdString>::const_iterator i = propSet.find(property);
+      const std::set<std::string> &propSet = it->second;
+      const std::set<std::string>::const_iterator i
+          = propSet.find(this->Property);
       if (i != propSet.end())
         {
         this->CheckResult = ALREADY_SEEN;
@@ -55,7 +75,7 @@ cmGeneratorExpressionDAGChecker::cmGeneratorExpressionDAGChecker(
         }
       }
     const_cast<cmGeneratorExpressionDAGChecker *>(top)
-                                            ->Seen[target].insert(property);
+      ->Seen[this->Target].insert(this->Property);
     }
 }
 
@@ -92,7 +112,7 @@ void cmGeneratorExpressionDAGChecker::ReportError(
       << "Self reference on target \""
       << context->HeadTarget->GetName() << "\".\n";
     context->Makefile->GetCMakeInstance()
-      ->IssueMessage(cmake::FATAL_ERROR, e.str().c_str(),
+      ->IssueMessage(cmake::FATAL_ERROR, e.str(),
                       parent->Backtrace);
     return;
     }
@@ -103,7 +123,7 @@ void cmGeneratorExpressionDAGChecker::ReportError(
     << "  " << expr << "\n"
     << "Dependency loop found.";
   context->Makefile->GetCMakeInstance()
-    ->IssueMessage(cmake::FATAL_ERROR, e.str().c_str(),
+    ->IssueMessage(cmake::FATAL_ERROR, e.str(),
                     context->Backtrace);
   }
 
@@ -116,7 +136,7 @@ void cmGeneratorExpressionDAGChecker::ReportError(
       << (parent->Content ? parent->Content->GetOriginalExpression() : expr)
       << "\n";
     context->Makefile->GetCMakeInstance()
-      ->IssueMessage(cmake::FATAL_ERROR, e.str().c_str(),
+      ->IssueMessage(cmake::FATAL_ERROR, e.str(),
                       parent->Backtrace);
     parent = parent->Parent;
     ++loopStep;
@@ -177,6 +197,18 @@ bool cmGeneratorExpressionDAGChecker::EvaluatingLinkLibraries(const char *tgt)
        || cmHasLiteralPrefix(prop, "LINK_INTERFACE_LIBRARIES_")
        || cmHasLiteralPrefix(prop, "IMPORTED_LINK_INTERFACE_LIBRARIES_"))
        || strcmp(prop, "INTERFACE_LINK_LIBRARIES") == 0;
+}
+
+std::string cmGeneratorExpressionDAGChecker::TopTarget() const
+{
+  const cmGeneratorExpressionDAGChecker *top = this;
+  const cmGeneratorExpressionDAGChecker *parent = this->Parent;
+  while (parent)
+    {
+    top = parent;
+    parent = parent->Parent;
+    }
+  return top->Target;
 }
 
 enum TransitiveProperty {

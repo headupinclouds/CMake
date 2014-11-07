@@ -56,7 +56,7 @@ public:
   void SetShowGenerators(bool showGen) { this->ShowGenerators = showGen; }
 
   /** Set the program name for standard document generation.  */
-  void SetName(const char* name);
+  void SetName(const std::string& name);
 
   /** Set a section of the documentation. Typical sections include Name,
       Usage, Description, Options */
@@ -102,6 +102,8 @@ private:
   bool PrintFiles(std::ostream& os, std::string const& pattern);
 
   bool PrintVersion(std::ostream& os);
+  bool PrintUsage(std::ostream& os);
+  bool PrintHelp(std::ostream& os);
   bool PrintHelpFull(std::ostream& os);
   bool PrintHelpOneManual(std::ostream& os);
   bool PrintHelpOneCommand(std::ostream& os);
@@ -115,7 +117,6 @@ private:
   bool PrintHelpListProperties(std::ostream& os);
   bool PrintHelpListVariables(std::ostream& os);
   bool PrintHelpListPolicies(std::ostream& os);
-  bool PrintDocumentationUsage(std::ostream& os);
   bool PrintOldCustomModules(std::ostream& os);
 
   const char* GetNameString() const;

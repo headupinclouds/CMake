@@ -316,7 +316,7 @@ shared library:
   )
   configure_file(cmake/ClimbingStatsConfig.cmake
     "${CMAKE_CURRENT_BINARY_DIR}/ClimbingStats/ClimbingStatsConfig.cmake"
-    COPY_ONLY
+    COPYONLY
   )
 
   set(ConfigPackageLocation lib/cmake/ClimbingStats)
@@ -563,6 +563,21 @@ as a ``REG_SZ`` value, with arbitrary name, that specifies the directory
 containing the package configuration file.
 
 There is no system package registry on non-Windows platforms.
+
+.. _`Disabling the Package Registry`:
+
+Disabling the Package Registry
+------------------------------
+
+In some cases using the Package Registries is not desirable. CMake
+allows to disable them using the following variables:
+
+ * :variable:`CMAKE_EXPORT_NO_PACKAGE_REGISTRY` disables the
+   :command:`export(PACKAGE)` command.
+ * :variable:`CMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY` disables the
+   User Package Registry in all the :command:`find_package` calls.
+ * :variable:`CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY` disables
+   the System Package Registry in all the :command:`find_package` calls.
 
 Package Registry Example
 ------------------------

@@ -46,7 +46,7 @@ public:
   /**
    * The name of the command as specified in CMakeList.txt.
    */
-  virtual const char* GetName() const { return "file";}
+  virtual std::string GetName() const { return "file";}
 
   cmTypeMacro(cmFileCommand, cmCommand);
 
@@ -75,6 +75,7 @@ protected:
 
   bool HandleTimestampCommand(std::vector<std::string> const& args);
   bool HandleGenerateCommand(std::vector<std::string> const& args);
+  bool HandleLockCommand(std::vector<std::string> const& args);
 
 private:
   void AddEvaluationFile(const std::string &inputName,

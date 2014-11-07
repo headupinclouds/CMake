@@ -64,13 +64,13 @@ void cmTestGenerator::GenerateScriptActions(std::ostream& os,
 
 //----------------------------------------------------------------------------
 void cmTestGenerator::GenerateScriptForConfig(std::ostream& os,
-                                              const char* config,
+                                              const std::string& config,
                                               Indent const& indent)
 {
   this->TestGenerated = true;
 
   // Set up generator expression evaluation context.
-  cmGeneratorExpression ge(this->Test->GetBacktrace());
+  cmGeneratorExpression ge(&this->Test->GetBacktrace());
 
   // Start the test command.
   os << indent << "add_test(" << this->Test->GetName() << " ";
@@ -97,7 +97,7 @@ void cmTestGenerator::GenerateScriptForConfig(std::ostream& os,
 
   // Generate the command line with full escapes.
   cmLocalGenerator* lg = mf->GetLocalGenerator();
-  os << lg->EscapeForCMake(exe.c_str());
+  os << lg->EscapeForCMake(exe);
   for(std::vector<std::string>::const_iterator ci = command.begin()+1;
       ci != command.end(); ++ci)
     {

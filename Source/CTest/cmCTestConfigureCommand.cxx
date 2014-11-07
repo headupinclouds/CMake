@@ -69,7 +69,7 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
         cmOStringStream e;
         e << "CMakeLists.txt file does not exist ["
           << cmakelists_file << "]";
-        this->SetError(e.str().c_str());
+        this->SetError(e.str());
         return 0;
         }
 
@@ -117,6 +117,15 @@ cmCTestGenericHandler* cmCTestConfigureCommand::InitializeHandler()
       cmakeConfigureCommand += " \"-G";
       cmakeConfigureCommand += cmakeGeneratorName;
       cmakeConfigureCommand += "\"";
+
+      const char* cmakeGeneratorPlatform =
+        this->Makefile->GetDefinition("CTEST_CMAKE_GENERATOR_PLATFORM");
+      if(cmakeGeneratorPlatform && *cmakeGeneratorPlatform)
+        {
+        cmakeConfigureCommand += " \"-A";
+        cmakeConfigureCommand += cmakeGeneratorPlatform;
+        cmakeConfigureCommand += "\"";
+        }
 
       const char* cmakeGeneratorToolset =
         this->Makefile->GetDefinition("CTEST_CMAKE_GENERATOR_TOOLSET");

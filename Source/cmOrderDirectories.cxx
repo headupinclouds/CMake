@@ -39,8 +39,8 @@ public:
 
     if(file.rfind(".framework") != std::string::npos)
       {
-      cmsys::RegularExpression splitFramework;
-      splitFramework.compile("^(.*)/(.*).framework/(.*)$");
+      static cmsys::RegularExpression
+        splitFramework("^(.*)/(.*).framework/(.*)$");
       if(splitFramework.find(file) &&
         (std::string::npos !=
          splitFramework.match(3).find(splitFramework.match(2))))
@@ -72,7 +72,10 @@ public:
       {
       // Check if this directory conflicts with the entry.
       std::string const& dir = this->OD->OriginalDirectories[i];
-      if(dir != this->Directory && this->FindConflict(dir))
+      if(dir != this->Directory &&
+         cmSystemTools::GetRealPath(dir) !=
+         cmSystemTools::GetRealPath(this->Directory) &&
+         this->FindConflict(dir))
         {
         // The library will be found in this directory but this is not
         // the directory named for it.  Add an entry to make sure the
@@ -90,7 +93,10 @@ public:
       {
       // Check if this directory conflicts with the entry.
       std::string const& dir = this->OD->OriginalDirectories[i];
-      if(dir != this->Directory && this->FindConflict(dir))
+      if(dir != this->Directory &&
+         cmSystemTools::GetRealPath(dir) !=
+         cmSystemTools::GetRealPath(this->Directory) &&
+         this->FindConflict(dir))
         {
         // The library will be found in this directory but it is
         // supposed to be found in an implicit search directory.
@@ -134,13 +140,13 @@ bool cmOrderDirectoriesConstraint::FileMayConflict(std::string const& dir,
     {
     // The file conflicts only if it is not the same as the original
     // file due to a symlink or hardlink.
-    return !cmSystemTools::SameFile(this->FullPath.c_str(), file.c_str());
+    return !cmSystemTools::SameFile(this->FullPath, file);
     }
 
   // Check if the file will be built by cmake.
-  std::set<cmStdString> const& files =
+  std::set<std::string> const& files =
     (this->GlobalGenerator->GetDirectoryContent(dir, false));
-  std::set<cmStdString>::const_iterator fi = files.find(name);
+  std::set<std::string>::const_iterator fi = files.find(name);
   return fi != files.end();
 }
 
@@ -200,7 +206,7 @@ bool cmOrderDirectoriesConstraintSOName::FindConflict(std::string const& dir)
     {
     // We do not have the soname.  Look for files in the directory
     // that may conflict.
-    std::set<cmStdString> const& files =
+    std::set<std::string> const& files =
       (this->GlobalGenerator
        ->GetDirectoryContent(dir, true));
 
@@ -208,9 +214,9 @@ bool cmOrderDirectoriesConstraintSOName::FindConflict(std::string const& dir)
     // know the soname just look at all files that start with the
     // file name.  Usually the soname starts with the library name.
     std::string base = this->FileName;
-    std::set<cmStdString>::const_iterator first = files.lower_bound(base);
+    std::set<std::string>::const_iterator first = files.lower_bound(base);
     ++base[base.size()-1];
-    std::set<cmStdString>::const_iterator last = files.upper_bound(base);
+    std::set<std::string>::const_iterator last = files.upper_bound(base);
     if(first != last)
       {
       return true;
@@ -251,8 +257,8 @@ bool cmOrderDirectoriesConstraintLibrary::FindConflict(std::string const& dir)
   if(!this->OD->LinkExtensions.empty() &&
      this->OD->RemoveLibraryExtension.find(this->FileName))
     {
-    cmStdString lib = this->OD->RemoveLibraryExtension.match(1);
-    cmStdString ext = this->OD->RemoveLibraryExtension.match(2);
+    std::string lib = this->OD->RemoveLibraryExtension.match(1);
+    std::string ext = this->OD->RemoveLibraryExtension.match(2);
     for(std::vector<std::string>::iterator
           i = this->OD->LinkExtensions.begin();
         i != this->OD->LinkExtensions.end(); ++i)
@@ -261,7 +267,7 @@ bool cmOrderDirectoriesConstraintLibrary::FindConflict(std::string const& dir)
         {
         std::string fname = lib;
         fname += *i;
-        if(this->FileMayConflict(dir, fname.c_str()))
+        if(this->FileMayConflict(dir, fname))
           {
           return true;
           }
@@ -326,8 +332,8 @@ void cmOrderDirectories::AddRuntimeLibrary(std::string const& fullPath,
 
       if(fullPath.rfind(".framework") != std::string::npos)
         {
-        cmsys::RegularExpression splitFramework;
-        splitFramework.compile("^(.*)/(.*).framework/(.*)$");
+        static cmsys::RegularExpression
+          splitFramework("^(.*)/(.*).framework/(.*)$");
         if(splitFramework.find(fullPath) &&
           (std::string::npos !=
            splitFramework.match(3).find(splitFramework.match(2))))
@@ -407,7 +413,7 @@ cmOrderDirectories
 //----------------------------------------------------------------------------
 void
 cmOrderDirectories
-::SetImplicitDirectories(std::set<cmStdString> const& implicitDirs)
+::SetImplicitDirectories(std::set<std::string> const& implicitDirs)
 {
   this->ImplicitDirectories = implicitDirs;
 }
@@ -444,11 +450,11 @@ void cmOrderDirectories::CollectOriginalDirectories()
 int cmOrderDirectories::AddOriginalDirectory(std::string const& dir)
 {
   // Add the runtime directory with a unique index.
-  std::map<cmStdString, int>::iterator i =
+  std::map<std::string, int>::iterator i =
     this->DirectoryIndex.find(dir);
   if(i == this->DirectoryIndex.end())
     {
-    std::map<cmStdString, int>::value_type
+    std::map<std::string, int>::value_type
       entry(dir, static_cast<int>(this->OriginalDirectories.size()));
     i = this->DirectoryIndex.insert(entry).first;
     this->OriginalDirectories.push_back(dir);

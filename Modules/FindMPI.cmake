@@ -160,7 +160,7 @@ set(_MPI_XL_Fortran_COMPILER_NAMES         mpixlf95   mpixlf95_r mpxlf95 mpxlf95
 # or if we know it matches the regular compiler.
 foreach (lang C CXX Fortran)
   foreach (id GNU Intel PGI XL)
-    if (NOT CMAKE_${lang}_COMPILER_ID OR "${CMAKE_${lang}_COMPILER_ID}" STREQUAL "${id}")
+    if (NOT CMAKE_${lang}_COMPILER_ID OR CMAKE_${lang}_COMPILER_ID STREQUAL id)
       list(APPEND _MPI_${lang}_COMPILER_NAMES ${_MPI_${id}_${lang}_COMPILER_NAMES})
     endif()
     unset(_MPI_${id}_${lang}_COMPILER_NAMES)    # clean up the namespace here
@@ -330,7 +330,7 @@ function (interrogate_mpi_compiler lang try_libs)
         string(REGEX MATCHALL "(^| )-I([^\" ]+|\"[^\"]+\")" MPI_ALL_INCLUDE_PATHS "${MPI_COMPILE_CMDLINE}")
         foreach(IPATH ${MPI_ALL_INCLUDE_PATHS})
           string(REGEX REPLACE "^ ?-I" "" IPATH ${IPATH})
-          string(REGEX REPLACE "//" "/" IPATH ${IPATH})
+          string(REPLACE "//" "/" IPATH ${IPATH})
           list(APPEND MPI_INCLUDE_PATH_WORK ${IPATH})
         endforeach()
 
@@ -354,7 +354,7 @@ function (interrogate_mpi_compiler lang try_libs)
         set(MPI_LINK_PATH)
         foreach(LPATH ${MPI_ALL_LINK_PATHS})
           string(REGEX REPLACE "^(| |-Wl,)-L" "" LPATH ${LPATH})
-          string(REGEX REPLACE "//" "/" LPATH ${LPATH})
+          string(REPLACE "//" "/" LPATH ${LPATH})
           list(APPEND MPI_LINK_PATH ${LPATH})
         endforeach()
 
@@ -378,19 +378,14 @@ function (interrogate_mpi_compiler lang try_libs)
         # Extract the set of libraries to link against from the link command
         # line
         string(REGEX MATCHALL "(^| )-l([^\" ]+|\"[^\"]+\")" MPI_LIBNAMES "${MPI_LINK_CMDLINE}")
+
         # add the compiler implicit directories because some compilers
         # such as the intel compiler have libraries that show up
         # in the showme list that can only be found in the implicit
-        # link directories of the compiler. Do this for C++ and C
-        # compilers if the implicit link directories are defined.
-        if (DEFINED CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES)
+        # link directories of the compiler.
+        if (DEFINED CMAKE_${lang}_IMPLICIT_LINK_DIRECTORIES)
           set(MPI_LINK_PATH
-            "${MPI_LINK_PATH};${CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES}")
-        endif ()
-
-        if (DEFINED CMAKE_C_IMPLICIT_LINK_DIRECTORIES)
-          set(MPI_LINK_PATH
-            "${MPI_LINK_PATH};${CMAKE_C_IMPLICIT_LINK_DIRECTORIES}")
+            "${MPI_LINK_PATH};${CMAKE_${lang}_IMPLICIT_LINK_DIRECTORIES}")
         endif ()
 
         # Determine full path names for all of the libraries that one needs
@@ -527,6 +522,7 @@ endfunction()
 # Most mpi distros have some form of mpiexec which gives us something we can reliably look for.
 find_program(MPIEXEC
   NAMES ${_MPI_EXEC_NAMES}
+  HINTS ${MPI_HOME} $ENV{MPI_HOME}
   PATHS ${_MPI_PREFIX_PATH}
   PATH_SUFFIXES bin
   DOC "Executable for running MPI programs.")
@@ -589,7 +585,9 @@ foreach (lang C CXX Fortran)
 
     find_program(MPI_${lang}_COMPILER
       NAMES  ${_MPI_${lang}_COMPILER_NAMES}
-      PATHS  "${MPI_HOME}/bin" "$ENV{MPI_HOME}/bin" ${_MPI_PREFIX_PATH})
+      HINTS  ${_MPI_BASE_DIR}/bin
+      PATHS  ${_MPI_PREFIX_PATH}
+      )
     interrogate_mpi_compiler(${lang} ${try_libs})
     mark_as_advanced(MPI_${lang}_COMPILER)
 

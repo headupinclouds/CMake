@@ -24,7 +24,7 @@
 
 //----------------------------------------------------------------------------
 cmGeneratorExpression::cmGeneratorExpression(
-  cmListFileBacktrace const& backtrace):
+  cmListFileBacktrace const* backtrace):
   Backtrace(backtrace)
 {
 }
@@ -33,17 +33,17 @@ cmGeneratorExpression::cmGeneratorExpression(
 cmsys::auto_ptr<cmCompiledGeneratorExpression>
 cmGeneratorExpression::Parse(std::string const& input)
 {
-  return this->Parse(input.c_str());
+  return cmsys::auto_ptr<cmCompiledGeneratorExpression>(
+    new cmCompiledGeneratorExpression(
+      this->Backtrace ? *this->Backtrace : cmListFileBacktrace(NULL),
+      input));
 }
 
 //----------------------------------------------------------------------------
 cmsys::auto_ptr<cmCompiledGeneratorExpression>
 cmGeneratorExpression::Parse(const char* input)
 {
-  return cmsys::auto_ptr<cmCompiledGeneratorExpression>(
-                                      new cmCompiledGeneratorExpression(
-                                        this->Backtrace,
-                                        input));
+  return this->Parse(std::string(input ? input : ""));
 }
 
 cmGeneratorExpression::~cmGeneratorExpression()
@@ -52,7 +52,7 @@ cmGeneratorExpression::~cmGeneratorExpression()
 
 //----------------------------------------------------------------------------
 const char *cmCompiledGeneratorExpression::Evaluate(
-  cmMakefile* mf, const char* config, bool quiet,
+  cmMakefile* mf, const std::string& config, bool quiet,
   cmTarget const* headTarget,
   cmGeneratorExpressionDAGChecker *dagChecker) const
 {
@@ -66,7 +66,7 @@ const char *cmCompiledGeneratorExpression::Evaluate(
 
 //----------------------------------------------------------------------------
 const char *cmCompiledGeneratorExpression::Evaluate(
-  cmMakefile* mf, const char* config, bool quiet,
+  cmMakefile* mf, const std::string& config, bool quiet,
   cmTarget const* headTarget,
   cmTarget const* currentTarget,
   cmGeneratorExpressionDAGChecker *dagChecker) const
@@ -89,7 +89,9 @@ const char *cmCompiledGeneratorExpression::Evaluate(
   context.Quiet = quiet;
   context.HadError = false;
   context.HadContextSensitiveCondition = false;
+  context.HadHeadSensitiveCondition = false;
   context.HeadTarget = headTarget;
+  context.EvaluateForBuildsystem = this->EvaluateForBuildsystem;
   context.CurrentTarget = currentTarget ? currentTarget : headTarget;
   context.Backtrace = this->Backtrace;
 
@@ -97,7 +99,7 @@ const char *cmCompiledGeneratorExpression::Evaluate(
     {
     this->Output += (*it)->Evaluate(&context, dagChecker);
 
-    for(std::set<cmStdString>::const_iterator
+    for(std::set<std::string>::const_iterator
           p = context.SeenTargetProperties.begin();
           p != context.SeenTargetProperties.end(); ++p)
       {
@@ -109,9 +111,13 @@ const char *cmCompiledGeneratorExpression::Evaluate(
       break;
       }
     }
+
+  this->MaxLanguageStandard = context.MaxLanguageStandard;
+
   if (!context.HadError)
     {
     this->HadContextSensitiveCondition = context.HadContextSensitiveCondition;
+    this->HadHeadSensitiveCondition = context.HadHeadSensitiveCondition;
     }
 
   this->DependTargets = context.DependTargets;
@@ -122,13 +128,15 @@ const char *cmCompiledGeneratorExpression::Evaluate(
 
 cmCompiledGeneratorExpression::cmCompiledGeneratorExpression(
               cmListFileBacktrace const& backtrace,
-              const char *input)
-  : Backtrace(backtrace), Input(input ? input : ""),
-    HadContextSensitiveCondition(false)
+              const std::string& input)
+  : Backtrace(backtrace), Input(input),
+    HadContextSensitiveCondition(false),
+    HadHeadSensitiveCondition(false),
+    EvaluateForBuildsystem(false)
 {
   cmGeneratorExpressionLexer l;
   std::vector<cmGeneratorExpressionToken> tokens =
-                                              l.Tokenize(this->Input.c_str());
+                                              l.Tokenize(this->Input);
   this->NeedsEvaluation = l.GetSawGeneratorExpression();
 
   if (this->NeedsEvaluation)
@@ -157,17 +165,24 @@ cmCompiledGeneratorExpression::~cmCompiledGeneratorExpression()
 std::string cmGeneratorExpression::StripEmptyListElements(
                                                     const std::string &input)
 {
+  if (input.find(';') == input.npos)
+    {
+    return input;
+    }
   std::string result;
+  result.reserve(input.size());
 
   const char *c = input.c_str();
+  const char *last = c;
   bool skipSemiColons = true;
   for ( ; *c; ++c)
     {
-    if(c[0] == ';')
+    if(*c == ';')
       {
       if(skipSemiColons)
         {
-        continue;
+        result.append(last, c - last);
+        last = c + 1;
         }
       skipSemiColons = true;
       }
@@ -175,8 +190,8 @@ std::string cmGeneratorExpression::StripEmptyListElements(
       {
       skipSemiColons = false;
       }
-    result += *c;
     }
+  result.append(last);
 
   if (!result.empty() && *(result.end() - 1) == ';')
     {
@@ -372,7 +387,7 @@ void cmGeneratorExpression::Split(const std::string &input,
         }
       if(!part.empty())
         {
-        cmSystemTools::ExpandListArgument(part.c_str(), output);
+        cmSystemTools::ExpandListArgument(part, output);
         }
       }
     pos += 2;
@@ -449,10 +464,23 @@ std::string::size_type cmGeneratorExpression::Find(const std::string &input)
 //----------------------------------------------------------------------------
 bool cmGeneratorExpression::IsValidTargetName(const std::string &input)
 {
-  cmsys::RegularExpression targetNameValidator;
   // The ':' is supported to allow use with IMPORTED targets. At least
   // Qt 4 and 5 IMPORTED targets use ':' as the namespace delimiter.
-  targetNameValidator.compile("^[A-Za-z0-9_.:+-]+$");
+  static cmsys::RegularExpression targetNameValidator("^[A-Za-z0-9_.:+-]+$");
 
-  return targetNameValidator.find(input.c_str());
+  return targetNameValidator.find(input);
+}
+
+//----------------------------------------------------------------------------
+void
+cmCompiledGeneratorExpression::GetMaxLanguageStandard(cmTarget const* tgt,
+                  std::map<std::string, std::string>& mapping)
+{
+  typedef std::map<cmTarget const*,
+                   std::map<std::string, std::string> > MapType;
+  MapType::const_iterator it = this->MaxLanguageStandard.find(tgt);
+  if (it != this->MaxLanguageStandard.end())
+    {
+    mapping = it->second;
+    }
 }

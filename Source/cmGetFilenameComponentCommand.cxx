@@ -26,7 +26,7 @@ bool cmGetFilenameComponentCommand
   // already, if so use that value
   if(args.size() == 4 && args[3] == "CACHE")
     {
-    const char* cacheValue = this->Makefile->GetDefinition(args[0].c_str());
+    const char* cacheValue = this->Makefile->GetDefinition(args[0]);
     if(cacheValue && !cmSystemTools::IsNOTFOUND(cacheValue))
       {
       return true;
@@ -97,17 +97,17 @@ bool cmGetFilenameComponentCommand
     // If the path given is relative evaluate it relative to the
     // current source directory.
     result = cmSystemTools::CollapseFullPath(
-      filename.c_str(), this->Makefile->GetCurrentDirectory());
+      filename, this->Makefile->GetCurrentDirectory());
     if(args[2] == "REALPATH")
       {
       // Resolve symlinks if possible
-      result = cmSystemTools::GetRealPath(result.c_str());
+      result = cmSystemTools::GetRealPath(result);
       }
     }
   else
     {
     std::string err = "unknown component " + args[2];
-    this->SetError(err.c_str());
+    this->SetError(err);
     return false;
     }
 
@@ -116,12 +116,12 @@ bool cmGetFilenameComponentCommand
     if(programArgs.size() && storeArgs.size())
       {
       this->Makefile->AddCacheDefinition
-        (storeArgs.c_str(), programArgs.c_str(),
+        (storeArgs, programArgs.c_str(),
          "", args[2] == "PATH" ? cmCacheManager::FILEPATH
          : cmCacheManager::STRING);
       }
     this->Makefile->AddCacheDefinition
-      (args[0].c_str(), result.c_str(), "",
+      (args[0], result.c_str(), "",
        args[2] == "PATH" ? cmCacheManager::FILEPATH
        : cmCacheManager::STRING);
     }
@@ -129,9 +129,9 @@ bool cmGetFilenameComponentCommand
     {
     if(programArgs.size() && storeArgs.size())
       {
-      this->Makefile->AddDefinition(storeArgs.c_str(), programArgs.c_str());
+      this->Makefile->AddDefinition(storeArgs, programArgs.c_str());
       }
-    this->Makefile->AddDefinition(args[0].c_str(), result.c_str());
+    this->Makefile->AddDefinition(args[0], result.c_str());
     }
 
   return true;

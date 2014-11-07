@@ -23,12 +23,12 @@
 class cmGlobalVisualStudio8Generator : public cmGlobalVisualStudio71Generator
 {
 public:
-  cmGlobalVisualStudio8Generator(const char* name,
-    const char* platformName, const char* additionalPlatformDefinition);
+  cmGlobalVisualStudio8Generator(const std::string& name,
+    const std::string& platformName);
   static cmGlobalGeneratorFactory* NewFactory();
 
   ///! Get the name for the generator.
-  virtual const char* GetName() const {return this->Name.c_str();}
+  virtual std::string GetName() const {return this->Name;}
 
   /** Get the documentation entry for this generator.  */
   static void GetDocumentation(cmDocumentationEntry& entry);
@@ -36,14 +36,17 @@ public:
   ///! Create a local generator appropriate to this Global Generator
   virtual cmLocalGenerator *CreateLocalGenerator();
 
+  virtual void EnableLanguage(std::vector<std::string>const& languages,
+                              cmMakefile *, bool optional);
   virtual void AddPlatformDefinitions(cmMakefile* mf);
+
+  virtual bool SetGeneratorPlatform(std::string const& p, cmMakefile* mf);
 
   /**
    * Override Configure and Generate to add the build-system check
    * target.
    */
   virtual void Configure();
-  virtual void Generate();
 
   /**
    * Where does this version of Visual Studio look for macros for the
@@ -67,6 +70,7 @@ public:
     return !this->WindowsCEVersion.empty(); }
 
 protected:
+  virtual void Generate();
   virtual const char* GetIDEVersion() { return "8.0"; }
 
   virtual std::string FindDevEnvCommand();
@@ -75,15 +79,19 @@ protected:
 
   bool AddCheckTarget();
 
+  /** Return true if the configuration needs to be deployed */
+  virtual bool NeedsDeploy(cmTarget::TargetType type) const;
+
   static cmIDEFlagTable const* GetExtraFlagTableVS8();
   virtual void WriteSLNHeader(std::ostream& fout);
   virtual void WriteSolutionConfigurations(std::ostream& fout);
   virtual void WriteProjectConfigurations(
-    std::ostream& fout, const char* name, cmTarget::TargetType type,
+    std::ostream& fout, const std::string& name, cmTarget::TargetType type,
     const std::set<std::string>& configsPartOfDefaultBuild,
-    const char* platformMapping = NULL);
+    const std::string& platformMapping = "");
   virtual bool ComputeTargetDepends();
-  virtual void WriteProjectDepends(std::ostream& fout, const char* name,
+  virtual void WriteProjectDepends(std::ostream& fout,
+                                   const std::string& name,
                                    const char* path, cmTarget const& t);
 
   std::string Name;

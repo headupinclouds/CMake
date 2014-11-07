@@ -63,9 +63,9 @@ bool cmCTestVC::InitialCheckout(const char* command)
     }
 
   // Construct the initial checkout command line.
-  std::vector<cmStdString> args = cmSystemTools::ParseArguments(command);
+  std::vector<std::string> args = cmSystemTools::ParseArguments(command);
   std::vector<char const*> vc_co;
-  for(std::vector<cmStdString>::const_iterator ai = args.begin();
+  for(std::vector<std::string>::const_iterator ai = args.begin();
       ai != args.end(); ++ai)
     {
     vc_co.push_back(ai->c_str());
@@ -166,10 +166,17 @@ void cmCTestVC::CleanupImpl()
 //----------------------------------------------------------------------------
 bool cmCTestVC::Update()
 {
-  this->NoteOldRevision();
-  this->Log << "--- Begin Update ---\n";
-  bool result = this->UpdateImpl();
-  this->Log << "--- End Update ---\n";
+  bool result = true;
+  // if update version only is on then do not actually update,
+  // just note the current version and finish
+  if(!cmSystemTools::IsOn(
+       this->CTest->GetCTestConfiguration("UpdateVersionOnly").c_str()))
+    {
+    this->NoteOldRevision();
+    this->Log << "--- Begin Update ---\n";
+    result = this->UpdateImpl();
+    this->Log << "--- End Update ---\n";
+    }
   this->NoteNewRevision();
   return result;
 }

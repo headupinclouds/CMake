@@ -91,9 +91,11 @@ These commands may be used freely in CMake projects.
    /command/source_group
    /command/string
    /command/target_compile_definitions
+   /command/target_compile_features
    /command/target_compile_options
    /command/target_include_directories
    /command/target_link_libraries
+   /command/target_sources
    /command/try_compile
    /command/try_run
    /command/unset
@@ -125,6 +127,8 @@ versions of CMake.  Do not use them in new code.
    /command/utility_source
    /command/variable_requires
    /command/write_file
+
+.. _`CTest Commands`:
 
 CTest Commands
 ==============

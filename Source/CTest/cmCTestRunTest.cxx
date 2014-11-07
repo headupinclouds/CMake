@@ -280,12 +280,12 @@ bool cmCTestRunTest::EndTest(size_t completed, size_t total, bool started)
 
   // Set the working directory to the tests directory
   std::string oldpath = cmSystemTools::GetCurrentWorkingDirectory();
-  cmSystemTools::ChangeDirectory(this->TestProperties->Directory.c_str());
+  cmSystemTools::ChangeDirectory(this->TestProperties->Directory);
 
   this->DartProcessing();
 
   // restore working directory
-  cmSystemTools::ChangeDirectory(oldpath.c_str());
+  cmSystemTools::ChangeDirectory(oldpath);
 
 
   // if this is doing MemCheck then all the output needs to be put into
@@ -334,9 +334,9 @@ bool cmCTestRunTest::EndTest(size_t completed, size_t total, bool started)
         *this->TestHandler->LogFile << "Test Failed.\n";
         }
       }
-    *this->TestHandler->LogFile << "\"" << this->TestProperties->Name.c_str()
+    *this->TestHandler->LogFile << "\"" << this->TestProperties->Name
       << "\" end time: " << this->CTest->CurrentTime() << std::endl
-      << "\"" << this->TestProperties->Name.c_str() << "\" time elapsed: "
+      << "\"" << this->TestProperties->Name << "\" time elapsed: "
       << buffer << std::endl
       << "----------------------------------------------------------"
       << std::endl << std::endl;
@@ -388,24 +388,11 @@ void cmCTestRunTest::MemCheckPostProcess()
     }
   cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT, this->Index
              << ": process test output now: "
-             << this->TestProperties->Name.c_str() << " "
-             << this->TestResult.Name.c_str() << std::endl);
+             << this->TestProperties->Name << " "
+             << this->TestResult.Name << std::endl);
   cmCTestMemCheckHandler * handler = static_cast<cmCTestMemCheckHandler*>
     (this->TestHandler);
-  switch ( handler->MemoryTesterStyle )
-    {
-    case cmCTestMemCheckHandler::VALGRIND:
-      handler->PostProcessValgrindTest(this->TestResult, this->Index);
-      break;
-    case cmCTestMemCheckHandler::PURIFY:
-      handler->PostProcessPurifyTest(this->TestResult, this->Index);
-      break;
-    case cmCTestMemCheckHandler::BOUNDS_CHECKER:
-      handler->PostProcessBoundsCheckerTest(this->TestResult, this->Index);
-      break;
-    default:
-      break;
-    }
+  handler->PostProcessTest(this->TestResult, this->Index);
 }
 
 //----------------------------------------------------------------------
@@ -465,9 +452,9 @@ bool cmCTestRunTest::StartTest(size_t total)
       //Required file was not found
       this->TestProcess = new cmProcess;
       *this->TestHandler->LogFile << "Unable to find required file: "
-               << file.c_str() << std::endl;
+               << file << std::endl;
       cmCTestLog(this->CTest, ERROR_MESSAGE, "Unable to find required file: "
-               << file.c_str() << std::endl);
+               << file << std::endl);
       this->TestResult.Output = "Unable to find required file: " + file;
       this->TestResult.FullCommandLine = "";
       this->TestResult.CompletionStatus = "Not Run";
@@ -482,9 +469,9 @@ bool cmCTestRunTest::StartTest(size_t total)
     // that has that information
     this->TestProcess = new cmProcess;
     *this->TestHandler->LogFile << "Unable to find executable: "
-                   << args[1].c_str() << std::endl;
+                   << args[1] << std::endl;
     cmCTestLog(this->CTest, ERROR_MESSAGE, "Unable to find executable: "
-               << args[1].c_str() << std::endl);
+               << args[1] << std::endl);
     this->TestResult.Output = "Unable to find executable: " + args[1];
     this->TestResult.FullCommandLine = "";
     this->TestResult.CompletionStatus = "Not Run";
@@ -711,7 +698,7 @@ void cmCTestRunTest::WriteLogOutputTop(size_t completed, size_t total)
   indexStr << " #" << this->Index << ":";
   cmCTestLog(this->CTest, HANDLER_OUTPUT,
              std::setw(3 + getNumWidth(this->TestHandler->GetMaxIndex()))
-             << indexStr.str().c_str());
+             << indexStr.str());
   cmCTestLog(this->CTest, HANDLER_OUTPUT, " ");
   const int maxTestNameWidth = this->CTest->GetMaxTestNameWidth();
   std::string outname = this->TestProperties->Name + " ";
@@ -722,18 +709,18 @@ void cmCTestRunTest::WriteLogOutputTop(size_t completed, size_t total)
     << this->TestProperties->Name << std::endl;
   *this->TestHandler->LogFile << this->TestProperties->Index << "/"
     << this->TestHandler->TotalNumberOfTests
-    << " Test: " << this->TestProperties->Name.c_str() << std::endl;
+    << " Test: " << this->TestProperties->Name << std::endl;
   *this->TestHandler->LogFile << "Command: \"" << this->ActualCommand << "\"";
 
   for (std::vector<std::string>::iterator i = this->Arguments.begin();
        i != this->Arguments.end(); ++i)
     {
     *this->TestHandler->LogFile
-      << " \"" << i->c_str() << "\"";
+      << " \"" << *i << "\"";
     }
   *this->TestHandler->LogFile << std::endl
     << "Directory: " << this->TestProperties->Directory << std::endl
-    << "\"" << this->TestProperties->Name.c_str() << "\" start time: "
+    << "\"" << this->TestProperties->Name << "\" start time: "
     << this->StartTime << std::endl;
 
   *this->TestHandler->LogFile
@@ -741,9 +728,9 @@ void cmCTestRunTest::WriteLogOutputTop(size_t completed, size_t total)
     << "----------------------------------------------------------"
     << std::endl;
   *this->TestHandler->LogFile
-    << this->ProcessOutput.c_str() << "<end of output>" << std::endl;
+    << this->ProcessOutput << "<end of output>" << std::endl;
 
   cmCTestLog(this->CTest, HANDLER_OUTPUT, outname.c_str());
   cmCTestLog(this->CTest, DEBUG, "Testing "
-             << this->TestProperties->Name.c_str() << " ... ");
+             << this->TestProperties->Name << " ... ");
 }

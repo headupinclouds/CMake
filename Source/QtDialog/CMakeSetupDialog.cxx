@@ -578,7 +578,8 @@ void CMakeSetupDialog::doInterrupt()
 void CMakeSetupDialog::doSourceBrowse()
 {
   QString dir = QFileDialog::getExistingDirectory(this,
-    tr("Enter Path to Source"), this->SourceDirectory->text());
+    tr("Enter Path to Source"), this->SourceDirectory->text(),
+    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
   if(!dir.isEmpty())
     {
     this->setSourceDirectory(dir);
@@ -608,7 +609,8 @@ void CMakeSetupDialog::updateBinaryDirectory(const QString& dir)
 void CMakeSetupDialog::doBinaryBrowse()
 {
   QString dir = QFileDialog::getExistingDirectory(this,
-    tr("Enter Path to Build"), this->BinaryDirectory->currentText());
+    tr("Enter Path to Build"), this->BinaryDirectory->currentText(),
+    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
   if(!dir.isEmpty() && dir != this->BinaryDirectory->currentText())
     {
     this->setBinaryDirectory(dir);
@@ -754,6 +756,9 @@ bool CMakeSetupDialog::setupFirstConfigure()
       QString systemName = dialog.getSystemName();
       m->insertProperty(QCMakeProperty::STRING, "CMAKE_SYSTEM_NAME",
                         tr("CMake System Name"), systemName, false);
+      QString systemVersion = dialog.getSystemVersion();
+      m->insertProperty(QCMakeProperty::STRING, "CMAKE_SYSTEM_VERSION",
+                        tr("CMake System Version"), systemVersion, false);
       QString cxxCompiler = dialog.getCXXCompiler();
       m->insertProperty(QCMakeProperty::FILEPATH, "CMAKE_CXX_COMPILER",
                         tr("CXX compiler."), cxxCompiler, false);

@@ -48,8 +48,8 @@ cmCTestLaunch::~cmCTestLaunch()
   cmsysProcess_Delete(this->Process);
   if(!this->Passthru)
     {
-    cmSystemTools::RemoveFile(this->LogOut.c_str());
-    cmSystemTools::RemoveFile(this->LogErr.c_str());
+    cmSystemTools::RemoveFile(this->LogOut);
+    cmSystemTools::RemoveFile(this->LogErr);
     }
 }
 
@@ -434,8 +434,8 @@ void cmCTestLaunch::WriteXMLAction(std::ostream& fxml)
     // If file is in source tree use its relative location.
     if(cmSystemTools::FileIsFullPath(this->SourceDir.c_str()) &&
        cmSystemTools::FileIsFullPath(source.c_str()) &&
-       cmSystemTools::IsSubDirectory(source.c_str(),
-                                     this->SourceDir.c_str()))
+       cmSystemTools::IsSubDirectory(source,
+                                     this->SourceDir))
       {
       source = cmSystemTools::RelativePath(this->SourceDir.c_str(),
                                            source.c_str());
@@ -567,7 +567,7 @@ void cmCTestLaunch::WriteXMLLabels(std::ostream& fxml)
     fxml << "\n";
     fxml << "\t\t<!-- Interested parties -->\n";
     fxml << "\t\t<Labels>\n";
-    for(std::set<cmStdString>::const_iterator li = this->Labels.begin();
+    for(std::set<std::string>::const_iterator li = this->Labels.begin();
         li != this->Labels.end(); ++li)
       {
       fxml << "\t\t\t<Label>" << cmXMLSafe(*li) << "</Label>\n";
@@ -680,8 +680,8 @@ bool cmCTestLaunch::ScrapeLog(std::string const& fname)
       continue;
       }
 
-    if(this->Match(line.c_str(), this->RegexWarning) &&
-       !this->Match(line.c_str(), this->RegexWarningSuppress))
+    if(this->Match(line, this->RegexWarning) &&
+       !this->Match(line, this->RegexWarningSuppress))
       {
       return true;
       }

@@ -25,7 +25,9 @@ function(run_cmake test)
       unset(expect_std${o})
     endif()
   endforeach()
-  set(RunCMake_TEST_SOURCE_DIR "${top_src}")
+  if (NOT RunCMake_TEST_SOURCE_DIR)
+    set(RunCMake_TEST_SOURCE_DIR "${top_src}")
+  endif()
   if(NOT RunCMake_TEST_BINARY_DIR)
     set(RunCMake_TEST_BINARY_DIR "${top_bin}/${test}-build")
   endif()
@@ -51,8 +53,10 @@ function(run_cmake test)
     execute_process(
       COMMAND ${CMAKE_COMMAND} "${RunCMake_TEST_SOURCE_DIR}"
                 -G "${RunCMake_GENERATOR}"
+                -A "${RunCMake_GENERATOR_PLATFORM}"
                 -T "${RunCMake_GENERATOR_TOOLSET}"
                 -DRunCMake_TEST=${test}
+                --no-warn-unused-cli
                 ${RunCMake_TEST_OPTIONS}
       WORKING_DIRECTORY "${RunCMake_TEST_BINARY_DIR}"
       OUTPUT_VARIABLE actual_stdout

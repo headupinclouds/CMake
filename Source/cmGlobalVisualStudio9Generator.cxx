@@ -22,17 +22,19 @@ class cmGlobalVisualStudio9Generator::Factory
   : public cmGlobalGeneratorFactory
 {
 public:
-  virtual cmGlobalGenerator* CreateGlobalGenerator(const char* name) const {
-    if(strstr(name, vs9generatorName) != name)
+  virtual cmGlobalGenerator* CreateGlobalGenerator(
+                                              const std::string& name) const {
+    if(strncmp(name.c_str(), vs9generatorName,
+               sizeof(vs9generatorName) - 1) != 0)
       {
       return 0;
       }
 
-    const char* p = name + sizeof(vs9generatorName) - 1;
+    const char* p = name.c_str() + sizeof(vs9generatorName) - 1;
     if(p[0] == '\0')
       {
       return new cmGlobalVisualStudio9Generator(
-        name, NULL, NULL);
+        name, "");
       }
 
     if(p[0] != ' ')
@@ -45,13 +47,13 @@ public:
     if(!strcmp(p, "IA64"))
       {
       return new cmGlobalVisualStudio9Generator(
-        name, "Itanium", "CMAKE_FORCE_IA64");
+        name, "Itanium");
       }
 
     if(!strcmp(p, "Win64"))
       {
       return new cmGlobalVisualStudio9Generator(
-        name, "x64", "CMAKE_FORCE_WIN64");
+        name, "x64");
       }
 
     cmVisualStudioWCEPlatformParser parser(p);
@@ -62,7 +64,7 @@ public:
       }
 
     cmGlobalVisualStudio9Generator* ret = new cmGlobalVisualStudio9Generator(
-      name, p, NULL);
+      name, p);
     ret->WindowsCEVersion = parser.GetOSVersion();
     return ret;
   }
@@ -96,10 +98,8 @@ cmGlobalGeneratorFactory* cmGlobalVisualStudio9Generator::NewFactory()
 
 //----------------------------------------------------------------------------
 cmGlobalVisualStudio9Generator::cmGlobalVisualStudio9Generator(
-  const char* name, const char* platformName,
-  const char* additionalPlatformDefinition)
-  : cmGlobalVisualStudio8Generator(name, platformName,
-                                   additionalPlatformDefinition)
+  const std::string& name, const std::string& platformName)
+  : cmGlobalVisualStudio8Generator(name, platformName)
 {
 }
 
@@ -115,18 +115,9 @@ cmLocalGenerator *cmGlobalVisualStudio9Generator::CreateLocalGenerator()
 {
   cmLocalVisualStudio7Generator *lg
     = new cmLocalVisualStudio7Generator(cmLocalVisualStudioGenerator::VS9);
-  lg->SetPlatformName(this->GetPlatformName());
   lg->SetExtraFlagTable(this->GetExtraFlagTableVS8());
   lg->SetGlobalGenerator(this);
   return lg;
-}
-
-//----------------------------------------------------------------------------
-void cmGlobalVisualStudio9Generator
-::EnableLanguage(std::vector<std::string>const &  lang,
-                 cmMakefile *mf, bool optional)
-{
-  cmGlobalVisualStudio8Generator::EnableLanguage(lang, mf, optional);
 }
 
 //----------------------------------------------------------------------------

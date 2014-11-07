@@ -11,16 +11,19 @@
 ============================================================================*/
 #include "cmInstallGenerator.h"
 
+#include "cmMakefile.h"
 #include "cmSystemTools.h"
 
 //----------------------------------------------------------------------------
 cmInstallGenerator
 ::cmInstallGenerator(const char* destination,
                      std::vector<std::string> const& configurations,
-                     const char* component):
+                     const char* component,
+                     MessageLevel message):
   cmScriptGenerator("CMAKE_INSTALL_CONFIG_NAME", configurations),
   Destination(destination? destination:""),
-  Component(component? component:"")
+  Component(component? component:""),
+  Message(message)
 {
 }
 
@@ -91,10 +94,17 @@ void cmInstallGenerator
         << "${CMAKE_ABSOLUTE_DESTINATION_FILES}\")\n";
      os << indent << "endif()\n";
      }
-  os << "file(INSTALL DESTINATION \"" << dest << "\" TYPE " << stype.c_str();
+  os << "file(INSTALL DESTINATION \"" << dest << "\" TYPE " << stype;
   if(optional)
     {
     os << " OPTIONAL";
+    }
+  switch(this->Message)
+    {
+    case MessageDefault: break;
+    case MessageAlways: os << " MESSAGE_ALWAYS"; break;
+    case MessageLazy:   os << " MESSAGE_LAZY"; break;
+    case MessageNever:  os << " MESSAGE_NEVER"; break;
     }
   if(permissions_file && *permissions_file)
     {
@@ -167,7 +177,7 @@ void cmInstallGenerator::GenerateScript(std::ostream& os)
 }
 
 //----------------------------------------------------------------------------
-bool cmInstallGenerator::InstallsForConfig(const char* config)
+bool cmInstallGenerator::InstallsForConfig(const std::string& config)
 {
   return this->GeneratesForConfig(config);
 }
@@ -183,4 +193,28 @@ std::string cmInstallGenerator::GetInstallDestination() const
     }
   result += this->Destination;
   return result;
+}
+
+//----------------------------------------------------------------------------
+cmInstallGenerator::MessageLevel
+cmInstallGenerator::SelectMessageLevel(cmMakefile* mf, bool never)
+{
+  if(never)
+    {
+    return MessageNever;
+    }
+  std::string m = mf->GetSafeDefinition("CMAKE_INSTALL_MESSAGE");
+  if(m == "ALWAYS")
+    {
+    return MessageAlways;
+    }
+  if(m == "LAZY")
+    {
+    return MessageLazy;
+    }
+  if(m == "NEVER")
+    {
+    return MessageNever;
+    }
+  return MessageDefault;
 }

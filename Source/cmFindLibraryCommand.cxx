@@ -37,7 +37,7 @@ bool cmFindLibraryCommand
     // value.
     if(this->AlreadyInCacheWithoutMetaInfo)
       {
-      this->Makefile->AddCacheDefinition(this->VariableName.c_str(), "",
+      this->Makefile->AddCacheDefinition(this->VariableName, "",
                                          this->VariableDocumentation.c_str(),
                                          cmCacheManager::FILEPATH);
       }
@@ -69,14 +69,14 @@ bool cmFindLibraryCommand
   if(library != "")
     {
     // Save the value in the cache
-    this->Makefile->AddCacheDefinition(this->VariableName.c_str(),
+    this->Makefile->AddCacheDefinition(this->VariableName,
                                        library.c_str(),
                                        this->VariableDocumentation.c_str(),
                                        cmCacheManager::FILEPATH);
     return true;
     }
   std::string notfound = this->VariableName + "-NOTFOUND";
-  this->Makefile->AddCacheDefinition(this->VariableName.c_str(),
+  this->Makefile->AddCacheDefinition(this->VariableName,
                                      notfound.c_str(),
                                      this->VariableDocumentation.c_str(),
                                      cmCacheManager::FILEPATH);
@@ -107,7 +107,7 @@ void cmFindLibraryCommand::AddArchitecturePath(
 
     // Follow "lib<suffix>".
     std::string next_dir = cur_dir + suffix;
-    if(cmSystemTools::FileIsDirectory(next_dir.c_str()))
+    if(cmSystemTools::FileIsDirectory(next_dir))
       {
       next_dir += dir.substr(pos+3);
       std::string::size_type next_pos = pos+3+strlen(suffix)+1;
@@ -115,7 +115,7 @@ void cmFindLibraryCommand::AddArchitecturePath(
       }
 
     // Follow "lib".
-    if(cmSystemTools::FileIsDirectory(cur_dir.c_str()))
+    if(cmSystemTools::FileIsDirectory(cur_dir))
       {
       this->AddArchitecturePath(dir, pos+3+1, suffix, false);
       }
@@ -124,13 +124,13 @@ void cmFindLibraryCommand::AddArchitecturePath(
     {
     // Check for <dir><suffix>/.
     std::string cur_dir  = dir + suffix + "/";
-    if(cmSystemTools::FileIsDirectory(cur_dir.c_str()))
+    if(cmSystemTools::FileIsDirectory(cur_dir))
       {
       this->SearchPaths.push_back(cur_dir);
       }
 
     // Now add the original unchanged path
-    if(cmSystemTools::FileIsDirectory(dir.c_str()))
+    if(cmSystemTools::FileIsDirectory(dir))
       {
       this->SearchPaths.push_back(dir);
       }
@@ -353,7 +353,7 @@ bool cmFindLibraryHelper::CheckDirectoryForName(std::string const& path,
     if(cmSystemTools::FileExists(this->TestPath.c_str(), true))
       {
       this->BestPath =
-        cmSystemTools::CollapseFullPath(this->TestPath.c_str());
+        cmSystemTools::CollapseFullPath(this->TestPath);
       cmSystemTools::ConvertToUnixSlashes(this->BestPath);
       return true;
       }
@@ -368,8 +368,8 @@ bool cmFindLibraryHelper::CheckDirectoryForName(std::string const& path,
   // Search for a file matching the library name regex.
   std::string dir = path;
   cmSystemTools::ConvertToUnixSlashes(dir);
-  std::set<cmStdString> const& files = this->GG->GetDirectoryContent(dir);
-  for(std::set<cmStdString>::const_iterator fi = files.begin();
+  std::set<std::string> const& files = this->GG->GetDirectoryContent(dir);
+  for(std::set<std::string>::const_iterator fi = files.begin();
       fi != files.end(); ++fi)
     {
     std::string const& origName = *fi;
@@ -382,7 +382,7 @@ bool cmFindLibraryHelper::CheckDirectoryForName(std::string const& path,
       {
       this->TestPath = path;
       this->TestPath += origName;
-      if(!cmSystemTools::FileIsDirectory(this->TestPath.c_str()))
+      if(!cmSystemTools::FileIsDirectory(this->TestPath))
         {
         // This is a matching file.  Check if it is better than the
         // best name found so far.  Earlier prefixes are preferred,
@@ -506,9 +506,9 @@ std::string cmFindLibraryCommand::FindFrameworkLibraryNamesPerDir()
       fwPath = *di;
       fwPath += *ni;
       fwPath += ".framework";
-      if(cmSystemTools::FileIsDirectory(fwPath.c_str()))
+      if(cmSystemTools::FileIsDirectory(fwPath))
         {
-        return cmSystemTools::CollapseFullPath(fwPath.c_str());
+        return cmSystemTools::CollapseFullPath(fwPath);
         }
       }
     }
@@ -532,9 +532,9 @@ std::string cmFindLibraryCommand::FindFrameworkLibraryDirsPerName()
       fwPath = *di;
       fwPath += *ni;
       fwPath += ".framework";
-      if(cmSystemTools::FileIsDirectory(fwPath.c_str()))
+      if(cmSystemTools::FileIsDirectory(fwPath))
         {
-        return cmSystemTools::CollapseFullPath(fwPath.c_str());
+        return cmSystemTools::CollapseFullPath(fwPath);
         }
       }
     }

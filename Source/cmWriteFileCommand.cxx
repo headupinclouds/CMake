@@ -47,7 +47,7 @@ bool cmWriteFileCommand
     {
     std::string e = "attempted to write a file: " + fileName
       + " into a source directory.";
-    this->SetError(e.c_str());
+    this->SetError(e);
     cmSystemTools::SetFatalErrorOccured();
     return false;
     }
@@ -63,8 +63,6 @@ bool cmWriteFileCommand
     cmSystemTools::SetPermissions(fileName.c_str(),
 #if defined( _MSC_VER ) || defined( __MINGW32__ )
       mode | S_IWRITE
-#elif defined( __BORLANDC__ )
-      mode | S_IWUSR
 #else
       mode | S_IWUSR | S_IWGRP
 #endif
@@ -79,7 +77,7 @@ bool cmWriteFileCommand
     std::string error = "Internal CMake error when trying to open file: ";
     error += fileName.c_str();
     error += " for writing.";
-    this->SetError(error.c_str());
+    this->SetError(error);
     return false;
     }
   file << message << std::endl;

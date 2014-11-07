@@ -16,6 +16,8 @@ Properties of Global Scope
    /prop_gbl/ALLOW_DUPLICATE_CUSTOM_TARGETS
    /prop_gbl/AUTOGEN_TARGETS_FOLDER
    /prop_gbl/AUTOMOC_TARGETS_FOLDER
+   /prop_gbl/CMAKE_C_KNOWN_FEATURES
+   /prop_gbl/CMAKE_CXX_KNOWN_FEATURES
    /prop_gbl/DEBUG_CONFIGURATIONS
    /prop_gbl/DISABLED_FEATURES
    /prop_gbl/ENABLED_FEATURES
@@ -49,7 +51,6 @@ Properties on Directories
    /prop_dir/CACHE_VARIABLES
    /prop_dir/CLEAN_NO_CUSTOM
    /prop_dir/CMAKE_CONFIGURE_DEPENDS
-   /prop_dir/COMPILE_DEFINITIONS_CONFIG
    /prop_dir/COMPILE_DEFINITIONS
    /prop_dir/COMPILE_OPTIONS
    /prop_dir/DEFINITIONS
@@ -78,6 +79,8 @@ Properties on Targets
    :maxdepth: 1
 
    /prop_tgt/ALIASED_TARGET
+   /prop_tgt/ANDROID_API
+   /prop_tgt/ANDROID_GUI
    /prop_tgt/ARCHIVE_OUTPUT_DIRECTORY_CONFIG
    /prop_tgt/ARCHIVE_OUTPUT_DIRECTORY
    /prop_tgt/ARCHIVE_OUTPUT_NAME_CONFIG
@@ -92,16 +95,26 @@ Properties on Targets
    /prop_tgt/BUILD_WITH_INSTALL_RPATH
    /prop_tgt/BUNDLE_EXTENSION
    /prop_tgt/BUNDLE
+   /prop_tgt/C_EXTENSIONS
+   /prop_tgt/C_STANDARD
+   /prop_tgt/C_STANDARD_REQUIRED
    /prop_tgt/COMPATIBLE_INTERFACE_BOOL
    /prop_tgt/COMPATIBLE_INTERFACE_NUMBER_MAX
    /prop_tgt/COMPATIBLE_INTERFACE_NUMBER_MIN
    /prop_tgt/COMPATIBLE_INTERFACE_STRING
-   /prop_tgt/COMPILE_DEFINITIONS_CONFIG
    /prop_tgt/COMPILE_DEFINITIONS
+   /prop_tgt/COMPILE_FEATURES
    /prop_tgt/COMPILE_FLAGS
    /prop_tgt/COMPILE_OPTIONS
+   /prop_tgt/COMPILE_PDB_NAME
+   /prop_tgt/COMPILE_PDB_NAME_CONFIG
+   /prop_tgt/COMPILE_PDB_OUTPUT_DIRECTORY
+   /prop_tgt/COMPILE_PDB_OUTPUT_DIRECTORY_CONFIG
    /prop_tgt/CONFIG_OUTPUT_NAME
    /prop_tgt/CONFIG_POSTFIX
+   /prop_tgt/CXX_EXTENSIONS
+   /prop_tgt/CXX_STANDARD
+   /prop_tgt/CXX_STANDARD_REQUIRED
    /prop_tgt/DEBUG_POSTFIX
    /prop_tgt/DEFINE_SYMBOL
    /prop_tgt/EchoString
@@ -144,10 +157,12 @@ Properties on Targets
    /prop_tgt/INSTALL_RPATH_USE_LINK_PATH
    /prop_tgt/INTERFACE_AUTOUIC_OPTIONS
    /prop_tgt/INTERFACE_COMPILE_DEFINITIONS
+   /prop_tgt/INTERFACE_COMPILE_FEATURES
    /prop_tgt/INTERFACE_COMPILE_OPTIONS
    /prop_tgt/INTERFACE_INCLUDE_DIRECTORIES
    /prop_tgt/INTERFACE_LINK_LIBRARIES
    /prop_tgt/INTERFACE_POSITION_INDEPENDENT_CODE
+   /prop_tgt/INTERFACE_SOURCES
    /prop_tgt/INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
    /prop_tgt/INTERPROCEDURAL_OPTIMIZATION_CONFIG
    /prop_tgt/INTERPROCEDURAL_OPTIMIZATION
@@ -190,9 +205,7 @@ Properties on Targets
    /prop_tgt/PDB_OUTPUT_DIRECTORY_CONFIG
    /prop_tgt/PDB_OUTPUT_DIRECTORY
    /prop_tgt/POSITION_INDEPENDENT_CODE
-   /prop_tgt/POST_INSTALL_SCRIPT
    /prop_tgt/PREFIX
-   /prop_tgt/PRE_INSTALL_SCRIPT
    /prop_tgt/PRIVATE_HEADER
    /prop_tgt/PROJECT_LABEL
    /prop_tgt/PUBLIC_HEADER
@@ -224,6 +237,7 @@ Properties on Targets
    /prop_tgt/VS_SCC_LOCALPATH
    /prop_tgt/VS_SCC_PROJECTNAME
    /prop_tgt/VS_SCC_PROVIDER
+   /prop_tgt/VS_WINRT_COMPONENT
    /prop_tgt/VS_WINRT_EXTENSIONS
    /prop_tgt/VS_WINRT_REFERENCES
    /prop_tgt/WIN32_EXECUTABLE
@@ -262,7 +276,6 @@ Properties on Source Files
    /prop_sf/ABSTRACT
    /prop_sf/AUTOUIC_OPTIONS
    /prop_sf/AUTORCC_OPTIONS
-   /prop_sf/COMPILE_DEFINITIONS_CONFIG
    /prop_sf/COMPILE_DEFINITIONS
    /prop_sf/COMPILE_FLAGS
    /prop_sf/EXTERNAL_OBJECT
@@ -277,7 +290,11 @@ Properties on Source Files
    /prop_sf/OBJECT_DEPENDS
    /prop_sf/OBJECT_OUTPUTS
    /prop_sf/SYMBOLIC
+   /prop_sf/VS_DEPLOYMENT_CONTENT
+   /prop_sf/VS_SHADER_TYPE
    /prop_sf/WRAP_EXCLUDE
+   /prop_sf/XCODE_EXPLICIT_FILE_TYPE
+   /prop_sf/XCODE_LAST_KNOWN_FILE_TYPE
 
 Properties on Cache Entries
 ===========================
@@ -291,3 +308,42 @@ Properties on Cache Entries
    /prop_cache/STRINGS
    /prop_cache/TYPE
    /prop_cache/VALUE
+
+Properties on Installed Files
+=============================
+
+.. toctree::
+   :maxdepth: 1
+
+   /prop_inst/CPACK_NEVER_OVERWRITE.rst
+   /prop_inst/CPACK_PERMANENT.rst
+   /prop_inst/CPACK_WIX_ACL.rst
+
+
+Deprecated Properties on Directories
+=====================================
+
+.. toctree::
+   :maxdepth: 1
+
+   /prop_dir/COMPILE_DEFINITIONS_CONFIG
+
+
+Deprecated Properties on Targets
+================================
+
+.. toctree::
+   :maxdepth: 1
+
+   /prop_tgt/COMPILE_DEFINITIONS_CONFIG
+   /prop_tgt/POST_INSTALL_SCRIPT
+   /prop_tgt/PRE_INSTALL_SCRIPT
+
+
+Deprecated Properties on Source Files
+=====================================
+
+.. toctree::
+   :maxdepth: 1
+
+   /prop_sf/COMPILE_DEFINITIONS_CONFIG

@@ -31,7 +31,7 @@ bool cmParseCacheCoverage::LoadCoverageData(const char* d)
     {
     std::string file = dir.GetFile(i);
     if(file != "." && file != ".."
-       && !cmSystemTools::FileIsDirectory(file.c_str()))
+       && !cmSystemTools::FileIsDirectory(file))
       {
       std::string path = d;
       path += "/";
@@ -215,7 +215,19 @@ bool cmParseCacheCoverage::ReadCMCovFile(const char* file)
       {
       coverageVector.push_back(-1);
       }
-    coverageVector[linenumber] += count;
+    // Accounts for lines that were previously marked
+    // as non-executable code (-1). if the parser comes back with
+    // a non-zero count, increase the count by 1 to push the line
+    // into the executable code set in addition to the count found.
+    if(coverageVector[linenumber] == -1 &&
+        count > 0)
+      {
+        coverageVector[linenumber] += count+1;
+      }
+    else
+      {
+        coverageVector[linenumber] += count;
+      }
     }
   return true;
 }

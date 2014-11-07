@@ -50,11 +50,18 @@ public:
   virtual int ParseChunk(const char* inputString,
                          std::string::size_type length);
   virtual int CleanupParser();
-
+  typedef void (*ReportFunction)(int, const char*, void*);
+  void SetErrorCallback(ReportFunction f, void* d)
+    {
+      this->ReportCallback = f;
+      this->ReportCallbackData = d;
+    }
 protected:
   //! This variable is true if there was a parse error while parsing in
   //chunks.
   int ParseError;
+  ReportFunction ReportCallback;
+  void* ReportCallbackData;
 
   //1 Expat parser structure.  Exists only during call to Parse().
   void* Parser;
@@ -74,11 +81,11 @@ protected:
    * element.  atts = Null-terminated array of attribute name/value pairs.
    * Even indices are attribute names, and odd indices are values.
    */
-  virtual void StartElement(const char* name, const char** atts);
+  virtual void StartElement(const std::string& name, const char** atts);
 
   //! Called at the end of an element in the XML source opened when
   //StartElement was called.
-  virtual void EndElement(const char* name);
+  virtual void EndElement(const std::string& name);
 
   //! Called when there is character data to handle.
   virtual void CharacterDataHandler(const char* data, int length);

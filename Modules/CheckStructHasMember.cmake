@@ -28,6 +28,7 @@
 #   CMAKE_REQUIRED_DEFINITIONS = list of macros to define (-DFOO=bar)
 #   CMAKE_REQUIRED_INCLUDES = list of include directories
 #   CMAKE_REQUIRED_LIBRARIES = list of libraries to link
+#   CMAKE_REQUIRED_QUIET = execute quietly without messages
 #
 #
 #
@@ -68,8 +69,7 @@ macro (CHECK_STRUCT_HAS_MEMBER _STRUCT _MEMBER _HEADER _RESULT)
 ${_INCLUDE_FILES}
 int main()
 {
-   ${_STRUCT}* tmp;
-   tmp->${_MEMBER};
+   (void)((${_STRUCT} *)0)->${_MEMBER};
    return 0;
 }
 ")

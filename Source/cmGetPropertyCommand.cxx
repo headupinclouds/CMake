@@ -67,13 +67,17 @@ bool cmGetPropertyCommand
     {
     scope = cmProperty::CACHE;
     }
+  else if(args[1] == "INSTALL")
+    {
+    scope = cmProperty::INSTALL;
+    }
   else
     {
     cmOStringStream e;
     e << "given invalid scope " << args[1] << ".  "
       << "Valid scopes are "
-      << "GLOBAL, DIRECTORY, TARGET, SOURCE, TEST, VARIABLE, CACHE.";
-    this->SetError(e.str().c_str());
+      << "GLOBAL, DIRECTORY, TARGET, SOURCE, TEST, VARIABLE, CACHE, INSTALL.";
+    this->SetError(e.str());
     return false;
     }
 
@@ -120,7 +124,7 @@ bool cmGetPropertyCommand
       {
       cmOStringStream e;
       e << "given invalid argument \"" << args[i] << "\".";
-      this->SetError(e.str().c_str());
+      this->SetError(e.str());
       return false;
       }
     }
@@ -139,7 +143,7 @@ bool cmGetPropertyCommand
     std::string output;
     if(cmPropertyDefinition* def =
        this->Makefile->GetCMakeInstance()->
-       GetPropertyDefinition(this->PropertyName.c_str(), scope))
+       GetPropertyDefinition(this->PropertyName, scope))
       {
       output = def->GetShortDescription();
       }
@@ -147,7 +151,7 @@ bool cmGetPropertyCommand
       {
       output = "NOTFOUND";
       }
-    this->Makefile->AddDefinition(this->Variable.c_str(), output.c_str());
+    this->Makefile->AddDefinition(this->Variable, output.c_str());
     }
   else if(this->InfoType == OutFullDoc)
     {
@@ -155,7 +159,7 @@ bool cmGetPropertyCommand
     std::string output;
     if(cmPropertyDefinition* def =
        this->Makefile->GetCMakeInstance()->
-       GetPropertyDefinition(this->PropertyName.c_str(), scope))
+       GetPropertyDefinition(this->PropertyName, scope))
       {
       output = def->GetFullDescription();
       }
@@ -163,19 +167,19 @@ bool cmGetPropertyCommand
       {
       output = "NOTFOUND";
       }
-    this->Makefile->AddDefinition(this->Variable.c_str(), output.c_str());
+    this->Makefile->AddDefinition(this->Variable, output.c_str());
     }
   else if(this->InfoType == OutDefined)
     {
     // Lookup if the property is defined
     if(this->Makefile->GetCMakeInstance()->
-       GetPropertyDefinition(this->PropertyName.c_str(), scope))
+       GetPropertyDefinition(this->PropertyName, scope))
       {
-      this->Makefile->AddDefinition(this->Variable.c_str(), "1");
+      this->Makefile->AddDefinition(this->Variable, "1");
       }
     else
       {
-      this->Makefile->AddDefinition(this->Variable.c_str(), "0");
+      this->Makefile->AddDefinition(this->Variable, "0");
       }
     }
   else
@@ -190,6 +194,7 @@ bool cmGetPropertyCommand
       case cmProperty::TEST:        return this->HandleTestMode();
       case cmProperty::VARIABLE:    return this->HandleVariableMode();
       case cmProperty::CACHE:       return this->HandleCacheMode();
+      case cmProperty::INSTALL:       return this->HandleInstallMode();
 
       case cmProperty::CACHED_VARIABLE:
         break; // should never happen
@@ -204,17 +209,17 @@ bool cmGetPropertyCommand::StoreResult(const char* value)
 {
   if(this->InfoType == OutSet)
     {
-    this->Makefile->AddDefinition(this->Variable.c_str(), value? "1":"0");
+    this->Makefile->AddDefinition(this->Variable, value? "1":"0");
     }
   else // if(this->InfoType == OutValue)
     {
     if(value)
       {
-      this->Makefile->AddDefinition(this->Variable.c_str(), value);
+      this->Makefile->AddDefinition(this->Variable, value);
       }
     else
       {
-      this->Makefile->RemoveDefinition(this->Variable.c_str());
+      this->Makefile->RemoveDefinition(this->Variable);
       }
     }
   return true;
@@ -231,7 +236,7 @@ bool cmGetPropertyCommand::HandleGlobalMode()
 
   // Get the property.
   cmake* cm = this->Makefile->GetCMakeInstance();
-  return this->StoreResult(cm->GetProperty(this->PropertyName.c_str()));
+  return this->StoreResult(cm->GetProperty(this->PropertyName));
 }
 
 //----------------------------------------------------------------------------
@@ -254,12 +259,12 @@ bool cmGetPropertyCommand::HandleDirectoryMode()
       }
 
     // The local generators are associated with collapsed paths.
-    dir = cmSystemTools::CollapseFullPath(dir.c_str());
+    dir = cmSystemTools::CollapseFullPath(dir);
 
     // Lookup the generator.
     if(cmLocalGenerator* lg =
        (this->Makefile->GetLocalGenerator()
-        ->GetGlobalGenerator()->FindLocalGenerator(dir.c_str())))
+        ->GetGlobalGenerator()->FindLocalGenerator(dir)))
       {
       // Use the makefile for the directory found.
       mf = lg->GetMakefile();
@@ -276,7 +281,7 @@ bool cmGetPropertyCommand::HandleDirectoryMode()
     }
 
   // Get the property.
-  return this->StoreResult(mf->GetProperty(this->PropertyName.c_str()));
+  return this->StoreResult(mf->GetProperty(this->PropertyName));
 }
 
 //----------------------------------------------------------------------------
@@ -295,14 +300,14 @@ bool cmGetPropertyCommand::HandleTargetMode()
       if(cmTarget* target =
                           this->Makefile->FindTargetToUse(this->Name))
         {
-        return this->StoreResult(target->GetName());
+        return this->StoreResult(target->GetName().c_str());
         }
       }
     return this->StoreResult((this->Variable + "-NOTFOUND").c_str());
     }
   if(cmTarget* target = this->Makefile->FindTargetToUse(this->Name))
     {
-    return this->StoreResult(target->GetProperty(this->PropertyName.c_str(),
+    return this->StoreResult(target->GetProperty(this->PropertyName,
                                                  this->Makefile));
     }
   else
@@ -310,7 +315,7 @@ bool cmGetPropertyCommand::HandleTargetMode()
     cmOStringStream e;
     e << "could not find TARGET " << this->Name
       << ".  Perhaps it has not yet been created.";
-    this->SetError(e.str().c_str());
+    this->SetError(e.str());
     return false;
     }
 }
@@ -326,17 +331,17 @@ bool cmGetPropertyCommand::HandleSourceMode()
 
   // Get the source file.
   if(cmSourceFile* sf =
-     this->Makefile->GetOrCreateSource(this->Name.c_str()))
+     this->Makefile->GetOrCreateSource(this->Name))
     {
     return
-      this->StoreResult(sf->GetPropertyForUser(this->PropertyName.c_str()));
+      this->StoreResult(sf->GetPropertyForUser(this->PropertyName));
     }
   else
     {
     cmOStringStream e;
     e << "given SOURCE name that could not be found or created: "
       << this->Name;
-    this->SetError(e.str().c_str());
+    this->SetError(e.str());
     return false;
     }
 }
@@ -351,15 +356,15 @@ bool cmGetPropertyCommand::HandleTestMode()
     }
 
   // Loop over all tests looking for matching names.
-  if(cmTest* test = this->Makefile->GetTest(this->Name.c_str()))
+  if(cmTest* test = this->Makefile->GetTest(this->Name))
     {
-    return this->StoreResult(test->GetProperty(this->PropertyName.c_str()));
+    return this->StoreResult(test->GetProperty(this->PropertyName));
     }
 
   // If not found it is an error.
   cmOStringStream e;
   e << "given TEST name that does not exist: " << this->Name;
-  this->SetError(e.str().c_str());
+  this->SetError(e.str());
   return false;
 }
 
@@ -373,7 +378,7 @@ bool cmGetPropertyCommand::HandleVariableMode()
     }
 
   return this->StoreResult
-    (this->Makefile->GetDefinition(this->PropertyName.c_str()));
+    (this->Makefile->GetDefinition(this->PropertyName));
 }
 
 //----------------------------------------------------------------------------
@@ -390,8 +395,38 @@ bool cmGetPropertyCommand::HandleCacheMode()
     this->Makefile->GetCacheManager()->GetCacheIterator(this->Name.c_str());
   if(!it.IsAtEnd())
     {
-    value = it.GetProperty(this->PropertyName.c_str());
+    value = it.GetProperty(this->PropertyName);
     }
   this->StoreResult(value);
   return true;
+}
+
+//----------------------------------------------------------------------------
+bool cmGetPropertyCommand::HandleInstallMode()
+{
+  if(this->Name.empty())
+    {
+    this->SetError("not given name for INSTALL scope.");
+    return false;
+    }
+
+  // Get the installed file.
+  cmake* cm = this->Makefile->GetCMakeInstance();
+
+  if(cmInstalledFile* file = cm->GetOrCreateInstalledFile(
+    this->Makefile, this->Name))
+    {
+    std::string value;
+    bool isSet = file->GetProperty(this->PropertyName, value);
+
+    return this->StoreResult(isSet ? value.c_str() : 0);
+    }
+  else
+    {
+    cmOStringStream e;
+    e << "given INSTALL name that could not be found or created: "
+      << this->Name;
+    this->SetError(e.str());
+    return false;
+    }
 }

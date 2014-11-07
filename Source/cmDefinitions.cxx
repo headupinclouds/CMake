@@ -15,7 +15,8 @@
 cmDefinitions::Def cmDefinitions::NoDef;
 
 //----------------------------------------------------------------------------
-cmDefinitions::cmDefinitions(cmDefinitions* parent): Up(parent)
+cmDefinitions::cmDefinitions(cmDefinitions* parent)
+  : Up(parent)
 {
 }
 
@@ -28,14 +29,14 @@ void cmDefinitions::Reset(cmDefinitions* parent)
 
 //----------------------------------------------------------------------------
 cmDefinitions::Def const&
-cmDefinitions::GetInternal(const char* key)
+cmDefinitions::GetInternal(const std::string& key)
 {
   MapType::const_iterator i = this->Map.find(key);
   if(i != this->Map.end())
     {
     return i->second;
     }
-  else if(cmDefinitions* up = this->Up)
+  if(cmDefinitions* up = this->Up)
     {
     // Query the parent scope and store the result locally.
     Def def = up->GetInternal(key);
@@ -46,21 +47,12 @@ cmDefinitions::GetInternal(const char* key)
 
 //----------------------------------------------------------------------------
 cmDefinitions::Def const&
-cmDefinitions::SetInternal(const char* key, Def const& def)
+cmDefinitions::SetInternal(const std::string& key, Def const& def)
 {
   if(this->Up || def.Exists)
     {
     // In lower scopes we store keys, defined or not.
-    MapType::iterator i = this->Map.find(key);
-    if(i == this->Map.end())
-      {
-      i = this->Map.insert(MapType::value_type(key, def)).first;
-      }
-    else
-      {
-      i->second = def;
-      }
-    return i->second;
+    return (this->Map[key] = def);
     }
   else
     {
@@ -71,23 +63,23 @@ cmDefinitions::SetInternal(const char* key, Def const& def)
 }
 
 //----------------------------------------------------------------------------
-const char* cmDefinitions::Get(const char* key)
+const char* cmDefinitions::Get(const std::string& key)
 {
   Def const& def = this->GetInternal(key);
   return def.Exists? def.c_str() : 0;
 }
 
 //----------------------------------------------------------------------------
-const char* cmDefinitions::Set(const char* key, const char* value)
+const char* cmDefinitions::Set(const std::string& key, const char* value)
 {
   Def const& def = this->SetInternal(key, Def(value));
   return def.Exists? def.c_str() : 0;
 }
 
 //----------------------------------------------------------------------------
-std::set<cmStdString> cmDefinitions::LocalKeys() const
+std::set<std::string> cmDefinitions::LocalKeys() const
 {
-  std::set<cmStdString> keys;
+  std::set<std::string> keys;
   // Consider local definitions.
   for(MapType::const_iterator mi = this->Map.begin();
       mi != this->Map.end(); ++mi)
@@ -110,12 +102,12 @@ cmDefinitions cmDefinitions::Closure() const
 cmDefinitions::cmDefinitions(ClosureTag const&, cmDefinitions const* root):
   Up(0)
 {
-  std::set<cmStdString> undefined;
+  std::set<std::string> undefined;
   this->ClosureImpl(undefined, root);
 }
 
 //----------------------------------------------------------------------------
-void cmDefinitions::ClosureImpl(std::set<cmStdString>& undefined,
+void cmDefinitions::ClosureImpl(std::set<std::string>& undefined,
                                 cmDefinitions const* defs)
 {
   // Consider local definitions.
@@ -145,17 +137,17 @@ void cmDefinitions::ClosureImpl(std::set<cmStdString>& undefined,
 }
 
 //----------------------------------------------------------------------------
-std::set<cmStdString> cmDefinitions::ClosureKeys() const
+std::set<std::string> cmDefinitions::ClosureKeys() const
 {
-  std::set<cmStdString> defined;
-  std::set<cmStdString> undefined;
+  std::set<std::string> defined;
+  std::set<std::string> undefined;
   this->ClosureKeys(defined, undefined);
   return defined;
 }
 
 //----------------------------------------------------------------------------
-void cmDefinitions::ClosureKeys(std::set<cmStdString>& defined,
-                                std::set<cmStdString>& undefined) const
+void cmDefinitions::ClosureKeys(std::set<std::string>& defined,
+                                std::set<std::string>& undefined) const
 {
   // Consider local definitions.
   for(MapType::const_iterator mi = this->Map.begin();
@@ -165,7 +157,7 @@ void cmDefinitions::ClosureKeys(std::set<cmStdString>& defined,
     if(defined.find(mi->first) == defined.end() &&
        undefined.find(mi->first) == undefined.end())
       {
-      std::set<cmStdString>& m = mi->second.Exists? defined : undefined;
+      std::set<std::string>& m = mi->second.Exists? defined : undefined;
       m.insert(mi->first);
       }
     }

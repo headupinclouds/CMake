@@ -20,6 +20,8 @@ cmXMLParser::cmXMLParser()
 {
   this->Parser = 0;
   this->ParseError = 0;
+  this->ReportCallback = 0;
+  this->ReportCallbackData = 0;
 }
 
 //----------------------------------------------------------------------------
@@ -152,14 +154,14 @@ int cmXMLParser::ParsingComplete()
 }
 
 //----------------------------------------------------------------------------
-void cmXMLParser::StartElement(const char * name,
+void cmXMLParser::StartElement(const std::string& name,
   const char ** /*atts*/)
 {
   std::cout << "Start element: " << name << std::endl;
 }
 
 //----------------------------------------------------------------------------
-void cmXMLParser::EndElement(const char * name)
+void cmXMLParser::EndElement(const std::string& name)
 {
   std::cout << "End element: " << name << std::endl;
 }
@@ -233,6 +235,13 @@ void cmXMLParser::ReportXmlParseError()
 //----------------------------------------------------------------------------
 void cmXMLParser::ReportError(int line, int, const char* msg)
 {
-  std::cerr << "Error parsing XML in stream at line "
-            << line << ": " << msg << std::endl;
+  if(this->ReportCallback)
+    {
+    this->ReportCallback(line, msg, this->ReportCallbackData);
+    }
+  else
+    {
+    std::cerr << "Error parsing XML in stream at line "
+              << line << ": " << msg << std::endl;
+    }
 }

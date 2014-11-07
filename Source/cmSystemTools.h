@@ -47,7 +47,7 @@ public:
                                    KeyWOW64 view = KeyWOW64_Default);
 
   ///! Escape quotes in a string.
-  static std::string EscapeQuotes(const char* str);
+  static std::string EscapeQuotes(const std::string& str);
 
   /** Map help document name to file name.  */
   static std::string HelpFileName(std::string);
@@ -57,14 +57,14 @@ public:
    */
   static std::string TrimWhitespace(const std::string& s);
 
-  typedef  void (*ErrorCallback)(const char*, const char*, bool&, void*);
+  typedef void (*MessageCallback)(const char*, const char*, bool&, void*);
   /**
    *  Set the function used by GUIs to display error messages
    *  Function gets passed: message as a const char*,
    *  title as a const char*, and a reference to bool that when
    *  set to false, will disable furthur messages (cancel).
    */
-  static void SetErrorCallback(ErrorCallback f, void* clientData=0);
+  static void SetMessageCallback(MessageCallback f, void* clientData=0);
 
   /**
    * Display an error message.
@@ -77,14 +77,17 @@ public:
    */
   static void Message(const char* m, const char* title=0);
 
+  typedef void (*OutputCallback)(const char*, size_t length, void*);
+
   ///! Send a string to stdout
   static void Stdout(const char* s);
-  static void Stdout(const char* s, int length);
-  typedef  void (*StdoutCallback)(const char*, int length, void*);
-  static void SetStdoutCallback(StdoutCallback, void* clientData=0);
+  static void Stdout(const char* s, size_t length);
+  static void SetStdoutCallback(OutputCallback, void* clientData=0);
 
-  ///! Send a string to stderr. Stdout callbacks will not be invoced.
-  static void Stderr(const char* s, int length);
+  ///! Send a string to stderr
+  static void Stderr(const char* s);
+  static void Stderr(const char* s, size_t length);
+  static void SetStderrCallback(OutputCallback, void* clientData=0);
 
 
   typedef bool (*InterruptCallback)(void*);
@@ -158,9 +161,10 @@ public:
   static std::string FileExistsInParentDirectories(const char* fname,
     const char* directory, const char* toplevel);
 
-  static void Glob(const char *directory, const char *regexp,
+  static void Glob(const std::string& directory, const std::string& regexp,
                    std::vector<std::string>& files);
-  static void GlobDirs(const char *fullPath, std::vector<std::string>& files);
+  static void GlobDirs(const std::string& fullPath,
+                       std::vector<std::string>& files);
 
   /**
    * Try to find a list of files that match the "simple" globbing
@@ -171,8 +175,8 @@ public:
    * want to find. 0 means all files, -1 means directories, 1 means
    * files only. This method returns true if search was succesfull.
    */
-  static bool SimpleGlob(const cmStdString& glob,
-                         std::vector<cmStdString>& files,
+  static bool SimpleGlob(const std::string& glob,
+                         std::vector<std::string>& files,
                          int type = 0);
 
   ///! Copy a file.
@@ -185,10 +189,10 @@ public:
   static bool RenameFile(const char* oldname, const char* newname);
 
   ///! Compute the md5sum of a file
-  static bool ComputeFileMD5(const char* source, char* md5out);
+  static bool ComputeFileMD5(const std::string& source, char* md5out);
 
   /** Compute the md5sum of a string.  */
-  static std::string ComputeStringMD5(const char* input);
+  static std::string ComputeStringMD5(const std::string& input);
 
   /**
    * Run a single executable command
@@ -233,18 +237,13 @@ public:
                                int* retVal = 0, const char* dir = 0,
                                OutputOption outputflag = OUTPUT_MERGE,
                                double timeout = 0.0);
-  static bool RunSingleCommand(std::vector<cmStdString> const& command,
-                               std::string* output = 0,
-                               int* retVal = 0, const char* dir = 0,
-                               OutputOption outputflag = OUTPUT_MERGE,
-                               double timeout = 0.0);
 
   static std::string PrintSingleCommand(std::vector<std::string> const&);
 
   /**
    * Parse arguments out of a single string command
    */
-  static std::vector<cmStdString> ParseArguments(const char* command);
+  static std::vector<std::string> ParseArguments(const char* command);
 
   /** Parse arguments out of a windows command line string.  */
   static void ParseWindowsCommandLine(const char* command,
@@ -253,8 +252,6 @@ public:
   /** Parse arguments out of a unix command line string.  */
   static void ParseUnixCommandLine(const char* command,
                                    std::vector<std::string>& args);
-  static void ParseUnixCommandLine(const char* command,
-                                   std::vector<cmStdString>& args);
 
   /** Compute an escaped version of the given argument for use in a
       windows shell.  See kwsys/System.h.in for details.  */
@@ -320,7 +317,7 @@ public:
 
   /** Split a string on its newlines into multiple lines.  Returns
       false only if the last line stored had no newline.  */
-  static bool Split(const char* s, std::vector<cmStdString>& l);
+  static bool Split(const char* s, std::vector<std::string>& l);
   static void SetForceUnixPaths(bool v)
     {
       s_ForceUnixPaths = v;
@@ -389,7 +386,7 @@ public:
   static bool ListTar(const char* outFileName,
                       bool gzip, bool verbose);
   static bool CreateTar(const char* outFileName,
-                        const std::vector<cmStdString>& files, bool gzip,
+                        const std::vector<std::string>& files, bool gzip,
                         bool bzip2, bool verbose);
   static bool ExtractTar(const char* inFileName, bool gzip,
                          bool verbose);
@@ -476,11 +473,13 @@ private:
   static bool s_FatalErrorOccured;
   static bool s_DisableMessages;
   static bool s_DisableRunCommandOutput;
-  static ErrorCallback s_ErrorCallback;
-  static StdoutCallback s_StdoutCallback;
+  static MessageCallback s_MessageCallback;
+  static OutputCallback s_StdoutCallback;
+  static OutputCallback s_StderrCallback;
   static InterruptCallback s_InterruptCallback;
-  static void* s_ErrorCallbackClientData;
+  static void* s_MessageCallbackClientData;
   static void* s_StdoutCallbackClientData;
+  static void* s_StderrCallbackClientData;
   static void* s_InterruptCallbackClientData;
 };
 

@@ -25,7 +25,9 @@
   SELECT(F, EvaluatingSystemIncludeDirectories, SYSTEM_INCLUDE_DIRECTORIES) \
   SELECT(F, EvaluatingCompileDefinitions,       COMPILE_DEFINITIONS) \
   SELECT(F, EvaluatingCompileOptions,           COMPILE_OPTIONS) \
-  SELECT(F, EvaluatingAutoUicOptions,           AUTOUIC_OPTIONS)
+  SELECT(F, EvaluatingAutoUicOptions,           AUTOUIC_OPTIONS) \
+  SELECT(F, EvaluatingSources,                  SOURCES) \
+  SELECT(F, EvaluatingCompileFeatures,          COMPILE_FEATURES)
 
 #define CM_FOR_EACH_TRANSITIVE_PROPERTY(F) \
   CM_FOR_EACH_TRANSITIVE_PROPERTY_IMPL(F, CM_SELECT_BOTH)
@@ -41,6 +43,10 @@ struct cmGeneratorExpressionDAGChecker
 {
   cmGeneratorExpressionDAGChecker(const cmListFileBacktrace &backtrace,
                                   const std::string &target,
+                                  const std::string &property,
+                                  const GeneratorExpressionContent *content,
+                                  cmGeneratorExpressionDAGChecker *parent);
+  cmGeneratorExpressionDAGChecker(const std::string &target,
                                   const std::string &property,
                                   const GeneratorExpressionContent *content,
                                   cmGeneratorExpressionDAGChecker *parent);
@@ -70,14 +76,17 @@ struct cmGeneratorExpressionDAGChecker
   void SetTransitivePropertiesOnly()
     { this->TransitivePropertiesOnly = true; }
 
+  std::string TopTarget() const;
+
 private:
   Result CheckGraph() const;
+  void Initialize();
 
 private:
   const cmGeneratorExpressionDAGChecker * const Parent;
   const std::string Target;
   const std::string Property;
-  std::map<cmStdString, std::set<cmStdString> > Seen;
+  std::map<std::string, std::set<std::string> > Seen;
   const GeneratorExpressionContent * const Content;
   const cmListFileBacktrace Backtrace;
   Result CheckResult;

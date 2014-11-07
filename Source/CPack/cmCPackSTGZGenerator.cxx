@@ -43,7 +43,7 @@ int cmCPackSTGZGenerator::InitializeInternal()
   if ( inFile.empty() )
     {
     cmCPackLogger(cmCPackLog::LOG_ERROR, "Cannot find template file: "
-      << inFile.c_str() << std::endl);
+      << inFile << std::endl);
     return 0;
     }
   this->SetOptionIfNotSet("CPACK_STGZ_HEADER_FILE", inFile.c_str());
@@ -71,8 +71,6 @@ int cmCPackSTGZGenerator::PackageFiles()
     retval &= cmSystemTools::SetPermissions((*it).c_str(),
 #if defined( _MSC_VER ) || defined( __MINGW32__ )
       S_IREAD | S_IWRITE | S_IEXEC
-#elif defined( __BORLANDC__ )
-      S_IRUSR | S_IWUSR | S_IXUSR
 #else
       S_IRUSR | S_IWUSR | S_IXUSR |
       S_IRGRP | S_IWGRP | S_IXGRP |
@@ -134,6 +132,6 @@ int cmCPackSTGZGenerator::GenerateHeader(std::ostream* os)
   cmSystemTools::ReplaceString(res, headerLengthTag, buffer);
 
   // Write in file
-  *os << res.c_str();
+  *os << res;
   return this->Superclass::GenerateHeader(os);
 }

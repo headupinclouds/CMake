@@ -18,19 +18,20 @@ class cmProperty
 {
 public:
   enum ScopeType { TARGET, SOURCE_FILE, DIRECTORY, GLOBAL, CACHE,
-                   TEST, VARIABLE, CACHED_VARIABLE };
+                   TEST, VARIABLE, CACHED_VARIABLE, INSTALL };
 
   // set this property
-  void Set(const char *name, const char *value);
+  void Set(const std::string& name, const char *value);
 
   // append to this property
-  void Append(const char *name, const char *value, bool asString = false);
+  void Append(const std::string& name, const char *value,
+              bool asString = false);
 
   // get the value
   const char *GetValue() const;
 
   // construct with the value not set
-  cmProperty() { this->ValueHasBeenSet = false; };
+  cmProperty() { this->ValueHasBeenSet = false; }
 
 protected:
   std::string Name;

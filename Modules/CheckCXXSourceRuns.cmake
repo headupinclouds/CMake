@@ -11,6 +11,7 @@
 #   <code>   - source code to try to compile
 #   <var>    - variable to store the result
 #              (1 for success, empty for failure)
+#              Will be created as an internal cache variable.
 #
 # The following variables may be set before calling this macro to modify
 # the way the check is run:
@@ -21,6 +22,7 @@
 #   CMAKE_REQUIRED_DEFINITIONS = list of macros to define (-DFOO=bar)
 #   CMAKE_REQUIRED_INCLUDES = list of include directories
 #   CMAKE_REQUIRED_LIBRARIES = list of libraries to link
+#   CMAKE_REQUIRED_QUIET = execute quietly without messages
 
 #=============================================================================
 # Copyright 2006-2009 Kitware, Inc.
@@ -38,7 +40,7 @@
 
 
 macro(CHECK_CXX_SOURCE_RUNS SOURCE VAR)
-  if("${VAR}" MATCHES "^${VAR}$")
+  if(NOT DEFINED "${VAR}")
     set(MACRO_CHECK_FUNCTION_DEFINITIONS
       "-D${VAR} ${CMAKE_REQUIRED_FLAGS}")
     if(CMAKE_REQUIRED_LIBRARIES)
@@ -56,7 +58,9 @@ macro(CHECK_CXX_SOURCE_RUNS SOURCE VAR)
     file(WRITE "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/src.cxx"
       "${SOURCE}\n")
 
-    message(STATUS "Performing Test ${VAR}")
+    if(NOT CMAKE_REQUIRED_QUIET)
+      message(STATUS "Performing Test ${VAR}")
+    endif()
     try_run(${VAR}_EXITCODE ${VAR}_COMPILED
       ${CMAKE_BINARY_DIR}
       ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/src.cxx
@@ -74,7 +78,9 @@ macro(CHECK_CXX_SOURCE_RUNS SOURCE VAR)
     # if the return value was 0 then it worked
     if("${${VAR}_EXITCODE}" EQUAL 0)
       set(${VAR} 1 CACHE INTERNAL "Test ${VAR}")
-      message(STATUS "Performing Test ${VAR} - Success")
+      if(NOT CMAKE_REQUIRED_QUIET)
+        message(STATUS "Performing Test ${VAR} - Success")
+      endif()
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
         "Performing C++ SOURCE FILE Test ${VAR} succeded with the following output:\n"
         "${OUTPUT}\n"
@@ -87,7 +93,9 @@ macro(CHECK_CXX_SOURCE_RUNS SOURCE VAR)
         set(${VAR} "" CACHE INTERNAL "Test ${VAR}")
       endif()
 
-      message(STATUS "Performing Test ${VAR} - Failed")
+      if(NOT CMAKE_REQUIRED_QUIET)
+        message(STATUS "Performing Test ${VAR} - Failed")
+      endif()
       file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
         "Performing C++ SOURCE FILE Test ${VAR} failed with the following output:\n"
         "${OUTPUT}\n"

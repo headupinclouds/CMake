@@ -13,6 +13,9 @@
 #define cmDefinitions_h
 
 #include "cmStandardIncludes.h"
+#if defined(CMAKE_BUILD_WITH_CMAKE)
+#include "cmsys/hash_map.hxx"
+#endif
 
 /** \class cmDefinitions
  * \brief Store a scope of variable definitions for CMake language.
@@ -35,28 +38,32 @@ public:
 
   /** Get the value associated with a key; null if none.
       Store the result locally if it came from a parent.  */
-  const char* Get(const char* key);
+  const char* Get(const std::string& key);
 
   /** Set (or unset if null) a value associated with a key.  */
-  const char* Set(const char* key, const char* value);
+  const char* Set(const std::string& key, const char* value);
 
   /** Get the set of all local keys.  */
-  std::set<cmStdString> LocalKeys() const;
+  std::set<std::string> LocalKeys() const;
 
   /** Compute the closure of all defined keys with values.
       This flattens the scope.  The result has no parent.  */
   cmDefinitions Closure() const;
 
   /** Compute the set of all defined keys.  */
-  std::set<cmStdString> ClosureKeys() const;
+  std::set<std::string> ClosureKeys() const;
 
 private:
   // String with existence boolean.
-  struct Def: public cmStdString
+  struct Def: public std::string
   {
-    Def(): cmStdString(), Exists(false) {}
-    Def(const char* v): cmStdString(v?v:""), Exists(v?true:false) {}
-    Def(Def const& d): cmStdString(d), Exists(d.Exists) {}
+  private:
+    typedef std::string std_string;
+  public:
+    Def(): std_string(), Exists(false) {}
+    Def(const char* v): std_string(v?v:""), Exists(v?true:false) {}
+    Def(const std_string& v): std_string(v), Exists(true) {}
+    Def(Def const& d): std_string(d), Exists(d.Exists) {}
     bool Exists;
   };
   static Def NoDef;
@@ -65,22 +72,26 @@ private:
   cmDefinitions* Up;
 
   // Local definitions, set or unset.
-  typedef std::map<cmStdString, Def> MapType;
+#if defined(CMAKE_BUILD_WITH_CMAKE)
+  typedef cmsys::hash_map<std::string, Def> MapType;
+#else
+  typedef std::map<std::string, Def> MapType;
+#endif
   MapType Map;
 
   // Internal query and update methods.
-  Def const& GetInternal(const char* key);
-  Def const& SetInternal(const char* key, Def const& def);
+  Def const& GetInternal(const std::string& key);
+  Def const& SetInternal(const std::string& key, Def const& def);
 
   // Implementation of Closure() method.
   struct ClosureTag {};
   cmDefinitions(ClosureTag const&, cmDefinitions const* root);
-  void ClosureImpl(std::set<cmStdString>& undefined,
+  void ClosureImpl(std::set<std::string>& undefined,
                    cmDefinitions const* defs);
 
   // Implementation of ClosureKeys() method.
-  void ClosureKeys(std::set<cmStdString>& defined,
-                   std::set<cmStdString>& undefined) const;
+  void ClosureKeys(std::set<std::string>& defined,
+                   std::set<std::string>& undefined) const;
 };
 
 #endif

@@ -103,7 +103,23 @@ function(ProcessorCount var)
         OUTPUT_VARIABLE machinfo_output)
       string(REGEX MATCHALL "Number of CPUs = ([0-9]+)" procs "${machinfo_output}")
       set(count "${CMAKE_MATCH_1}")
+      if(NOT count)
+        string(REGEX MATCHALL "([0-9]+) logical processors" procs "${machinfo_output}")
+        set(count "${CMAKE_MATCH_1}")
+      endif()
       #message("ProcessorCount: trying machinfo '${ProcessorCount_cmd_machinfo}'")
+    else()
+      find_program(ProcessorCount_cmd_mpsched mpsched)
+      mark_as_advanced(ProcessorCount_cmd_mpsched)
+      if(ProcessorCount_cmd_mpsched)
+        execute_process(COMMAND ${ProcessorCount_cmd_mpsched} -s
+          OUTPUT_QUIET
+          ERROR_STRIP_TRAILING_WHITESPACE
+          ERROR_VARIABLE mpsched_output)
+        string(REGEX MATCHALL "Processor Count *: *([0-9]+)" procs "${mpsched_output}")
+        set(count "${CMAKE_MATCH_1}")
+        #message("ProcessorCount: trying mpsched -s '${ProcessorCount_cmd_mpsched}'")
+      endif()
     endif()
   endif()
 

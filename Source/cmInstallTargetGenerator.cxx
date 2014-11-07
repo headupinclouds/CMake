@@ -24,8 +24,10 @@ cmInstallTargetGenerator
 ::cmInstallTargetGenerator(cmTarget& t, const char* dest, bool implib,
                            const char* file_permissions,
                            std::vector<std::string> const& configurations,
-                           const char* component, bool optional):
-  cmInstallGenerator(dest, configurations, component), Target(&t),
+                           const char* component,
+                           MessageLevel message,
+                           bool optional):
+  cmInstallGenerator(dest, configurations, component, message), Target(&t),
   ImportLibrary(implib), FilePermissions(file_permissions), Optional(optional)
 {
   this->ActionsPerConfig = true;
@@ -60,8 +62,8 @@ void cmInstallTargetGenerator::GenerateScript(std::ostream& os)
 
 //----------------------------------------------------------------------------
 void cmInstallTargetGenerator::GenerateScriptForConfig(std::ostream& os,
-                                                       const char* config,
-                                                       Indent const& indent)
+                                                    const std::string& config,
+                                                    Indent const& indent)
 {
   // Compute the build tree directory from which to copy the target.
   std::string fromDirConfig;
@@ -339,7 +341,7 @@ void cmInstallTargetGenerator::GenerateScriptForConfig(std::ostream& os,
 
 //----------------------------------------------------------------------------
 std::string
-cmInstallTargetGenerator::GetInstallFilename(const char* config) const
+cmInstallTargetGenerator::GetInstallFilename(const std::string& config) const
 {
   NameType nameType = this->ImportLibrary? NameImplib : NameNormal;
   return
@@ -350,7 +352,7 @@ cmInstallTargetGenerator::GetInstallFilename(const char* config) const
 //----------------------------------------------------------------------------
 std::string
 cmInstallTargetGenerator::GetInstallFilename(cmTarget const* target,
-                                             const char* config,
+                                             const std::string& config,
                                              NameType nameType)
 {
   std::string fname;
@@ -425,7 +427,7 @@ cmInstallTargetGenerator::GetInstallFilename(cmTarget const* target,
 //----------------------------------------------------------------------------
 void
 cmInstallTargetGenerator
-::AddTweak(std::ostream& os, Indent const& indent, const char* config,
+::AddTweak(std::ostream& os, Indent const& indent, const std::string& config,
            std::string const& file, TweakMethod tweak)
 {
   cmOStringStream tw;
@@ -443,7 +445,7 @@ cmInstallTargetGenerator
 //----------------------------------------------------------------------------
 void
 cmInstallTargetGenerator
-::AddTweak(std::ostream& os, Indent const& indent, const char* config,
+::AddTweak(std::ostream& os, Indent const& indent, const std::string& config,
            std::vector<std::string> const& files, TweakMethod tweak)
 {
   if(files.size() == 1)
@@ -490,7 +492,7 @@ std::string cmInstallTargetGenerator::GetDestDirPath(std::string const& file)
 //----------------------------------------------------------------------------
 void cmInstallTargetGenerator::PreReplacementTweaks(std::ostream& os,
                                                     Indent const& indent,
-                                                    const char* config,
+                                                    const std::string& config,
                                                     std::string const& file)
 {
   this->AddRPathCheckRule(os, indent, config, file);
@@ -498,9 +500,9 @@ void cmInstallTargetGenerator::PreReplacementTweaks(std::ostream& os,
 
 //----------------------------------------------------------------------------
 void cmInstallTargetGenerator::PostReplacementTweaks(std::ostream& os,
-                                                     Indent const& indent,
-                                                     const char* config,
-                                                     std::string const& file)
+                                                    Indent const& indent,
+                                                    const std::string& config,
+                                                    std::string const& file)
 {
   this->AddInstallNamePatchRule(os, indent, config, file);
   this->AddChrpathPatchRule(os, indent, config, file);
@@ -512,7 +514,8 @@ void cmInstallTargetGenerator::PostReplacementTweaks(std::ostream& os,
 void
 cmInstallTargetGenerator
 ::AddInstallNamePatchRule(std::ostream& os, Indent const& indent,
-                          const char* config, std::string const& toDestDirPath)
+                          const std::string& config,
+                          std::string const& toDestDirPath)
 {
   if(this->ImportLibrary ||
      !(this->Target->GetType() == cmTarget::SHARED_LIBRARY ||
@@ -533,7 +536,7 @@ cmInstallTargetGenerator
 
   // Build a map of build-tree install_name to install-tree install_name for
   // shared libraries linked to this target.
-  std::map<cmStdString, cmStdString> install_name_remap;
+  std::map<std::string, std::string> install_name_remap;
   if(cmComputeLinkInformation* cli = this->Target->GetLinkInformation(config))
     {
     std::set<cmTarget const*> const& sharedLibs
@@ -610,7 +613,7 @@ cmInstallTargetGenerator
       {
       os << "\n" << indent << "  -id \"" << new_id << "\"";
       }
-    for(std::map<cmStdString, cmStdString>::const_iterator
+    for(std::map<std::string, std::string>::const_iterator
           i = install_name_remap.begin();
         i != install_name_remap.end(); ++i)
       {
@@ -625,7 +628,8 @@ cmInstallTargetGenerator
 void
 cmInstallTargetGenerator
 ::AddRPathCheckRule(std::ostream& os, Indent const& indent,
-                    const char* config, std::string const& toDestDirPath)
+                    const std::string& config,
+                    std::string const& toDestDirPath)
 {
   // Skip the chrpath if the target does not need it.
   if(this->ImportLibrary || !this->Target->IsChrpathUsed(config))
@@ -662,7 +666,8 @@ cmInstallTargetGenerator
 void
 cmInstallTargetGenerator
 ::AddChrpathPatchRule(std::ostream& os, Indent const& indent,
-                      const char* config, std::string const& toDestDirPath)
+                      const std::string& config,
+                      std::string const& toDestDirPath)
 {
   // Skip the chrpath if the target does not need it.
   if(this->ImportLibrary || !this->Target->IsChrpathUsed(config))
@@ -678,46 +683,72 @@ cmInstallTargetGenerator
     return;
     }
 
-  if(this->Target->GetMakefile()->IsOn("CMAKE_PLATFORM_HAS_INSTALLNAME"))
+  cmMakefile* mf = this->Target->GetMakefile();
+
+  if(mf->IsOn("CMAKE_PLATFORM_HAS_INSTALLNAME"))
     {
     // If using install_name_tool, set up the rules to modify the rpaths.
     std::string installNameTool =
-      this->Target->GetMakefile()->
-      GetSafeDefinition("CMAKE_INSTALL_NAME_TOOL");
+      mf->GetSafeDefinition("CMAKE_INSTALL_NAME_TOOL");
 
     std::vector<std::string> oldRuntimeDirs, newRuntimeDirs;
     cli->GetRPath(oldRuntimeDirs, false);
     cli->GetRPath(newRuntimeDirs, true);
 
-    // Note: These paths are kept unique to avoid install_name_tool corruption.
-    std::set<std::string> runpaths;
-    for(std::vector<std::string>::const_iterator i = oldRuntimeDirs.begin();
-        i != oldRuntimeDirs.end(); ++i)
-      {
-      std::string runpath = this->Target->GetMakefile()->GetLocalGenerator()->
-        GetGlobalGenerator()->ExpandCFGIntDir(*i, config);
+    std::string darwin_major_version_s =
+      mf->GetSafeDefinition("DARWIN_MAJOR_VERSION");
 
-      if(runpaths.find(runpath) == runpaths.end())
-        {
-        runpaths.insert(runpath);
-        os << indent << "execute_process(COMMAND " << installNameTool << "\n";
-        os << indent << "  -delete_rpath \"" << runpath << "\"\n";
-        os << indent << "  \"" << toDestDirPath << "\")\n";
-        }
+    std::stringstream ss(darwin_major_version_s);
+    int darwin_major_version;
+    ss >> darwin_major_version;
+    if(!ss.fail() && darwin_major_version <= 9 &&
+       (!oldRuntimeDirs.empty() || !newRuntimeDirs.empty())
+      )
+      {
+      cmOStringStream msg;
+      msg << "WARNING: Target \"" << this->Target->GetName()
+        << "\" has runtime paths which cannot be changed during install.  "
+        << "To change runtime paths, OS X version 10.6 or newer is required.  "
+        << "Therefore, runtime paths will not be changed when installing.  "
+        << "CMAKE_BUILD_WITH_INSTALL_RPATH may be used to work around"
+           " this limitation.";
+      mf->IssueMessage(cmake::WARNING, msg.str());
       }
-
-    runpaths.clear();
-    for(std::vector<std::string>::const_iterator i = newRuntimeDirs.begin();
-        i != newRuntimeDirs.end(); ++i)
+    else
       {
-      std::string runpath = this->Target->GetMakefile()->GetLocalGenerator()->
-        GetGlobalGenerator()->ExpandCFGIntDir(*i, config);
-
-      if(runpaths.find(runpath) == runpaths.end())
+      // Note: These paths are kept unique to avoid
+      // install_name_tool corruption.
+      std::set<std::string> runpaths;
+      for(std::vector<std::string>::const_iterator i = oldRuntimeDirs.begin();
+          i != oldRuntimeDirs.end(); ++i)
         {
-        os << indent << "execute_process(COMMAND " << installNameTool << "\n";
-        os << indent << "  -add_rpath \"" << runpath << "\"\n";
-        os << indent << "  \"" << toDestDirPath << "\")\n";
+        std::string runpath =
+          mf->GetLocalGenerator()->
+          GetGlobalGenerator()->ExpandCFGIntDir(*i, config);
+
+        if(runpaths.find(runpath) == runpaths.end())
+          {
+          runpaths.insert(runpath);
+          os << indent << "execute_process(COMMAND " << installNameTool <<"\n";
+          os << indent << "  -delete_rpath \"" << runpath << "\"\n";
+          os << indent << "  \"" << toDestDirPath << "\")\n";
+          }
+        }
+
+      runpaths.clear();
+      for(std::vector<std::string>::const_iterator i = newRuntimeDirs.begin();
+          i != newRuntimeDirs.end(); ++i)
+        {
+        std::string runpath =
+          mf->GetLocalGenerator()->
+          GetGlobalGenerator()->ExpandCFGIntDir(*i, config);
+
+        if(runpaths.find(runpath) == runpaths.end())
+          {
+          os << indent << "execute_process(COMMAND " << installNameTool <<"\n";
+          os << indent << "  -add_rpath \"" << runpath << "\"\n";
+          os << indent << "  \"" << toDestDirPath << "\")\n";
+          }
         }
       }
     }

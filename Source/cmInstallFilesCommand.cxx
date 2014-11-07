@@ -100,9 +100,9 @@ void cmInstallFilesCommand::FinalPass()
   else     // reg exp list
     {
     std::vector<std::string> files;
-    std::string regex = this->FinalArgs[0].c_str();
+    std::string regex = this->FinalArgs[0];
     cmSystemTools::Glob(this->Makefile->GetCurrentDirectory(),
-                        regex.c_str(), files);
+                        regex, files);
 
     std::vector<std::string>::iterator s = files.begin();
     // for each argument, get the files
@@ -132,11 +132,13 @@ void cmInstallFilesCommand::CreateInstallGenerator() const
   std::string no_component = this->Makefile->GetSafeDefinition(
                                        "CMAKE_INSTALL_DEFAULT_COMPONENT_NAME");
   std::vector<std::string> no_configurations;
+  cmInstallGenerator::MessageLevel message =
+    cmInstallGenerator::SelectMessageLevel(this->Makefile);
   this->Makefile->AddInstallGenerator(
     new cmInstallFilesGenerator(this->Makefile, this->Files,
                                 destination.c_str(), false,
                                 no_permissions, no_configurations,
-                                no_component.c_str(), no_rename));
+                                no_component.c_str(), message, no_rename));
 }
 
 

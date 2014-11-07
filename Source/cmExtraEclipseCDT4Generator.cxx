@@ -45,7 +45,7 @@ cmExtraEclipseCDT4Generator
 
 //----------------------------------------------------------------------------
 void cmExtraEclipseCDT4Generator
-::GetDocumentation(cmDocumentationEntry& entry, const char*) const
+::GetDocumentation(cmDocumentationEntry& entry, const std::string&) const
 {
   entry.Name = this->GetName();
   entry.Brief = "Generates Eclipse CDT 4.0 project files.";
@@ -124,8 +124,8 @@ void cmExtraEclipseCDT4Generator::Generate()
               "Enable CMAKE_ECLIPSE_GENERATE_SOURCE_PROJECT instead.");
     }
 
-  if (cmSystemTools::IsSubDirectory(this->HomeOutputDirectory.c_str(),
-                                    this->HomeDirectory.c_str()))
+  if (cmSystemTools::IsSubDirectory(this->HomeOutputDirectory,
+                                    this->HomeDirectory))
     {
     mf->IssueMessage(cmake::WARNING, "The build directory is a subdirectory "
                      "of the source directory.\n"
@@ -205,7 +205,7 @@ void cmExtraEclipseCDT4Generator::AddEnvVar(cmGeneratedFileStream& fout,
   std::string cacheEntryName = "CMAKE_ECLIPSE_ENVVAR_";
   cacheEntryName += envVar;
   const char* cacheValue = mf->GetCacheManager()->GetCacheValue(
-                                                       cacheEntryName.c_str());
+                                                       cacheEntryName);
 
   // now we have both, decide which one to use
   std::string valueToUse;
@@ -219,7 +219,7 @@ void cmExtraEclipseCDT4Generator::AddEnvVar(cmGeneratedFileStream& fout,
     // The variable is in the env, but not in the cache. Use it and put it
     // in the cache
     valueToUse = envVarValue;
-    mf->AddCacheDefinition(cacheEntryName.c_str(), valueToUse.c_str(),
+    mf->AddCacheDefinition(cacheEntryName, valueToUse.c_str(),
                            cacheEntryName.c_str(), cmCacheManager::STRING,
                            true);
     mf->GetCacheManager()->SaveCache(mf->GetHomeOutputDirectory());
@@ -240,7 +240,7 @@ void cmExtraEclipseCDT4Generator::AddEnvVar(cmGeneratedFileStream& fout,
     if (valueToUse.find(envVarValue) == std::string::npos)
       {
       valueToUse = envVarValue;
-      mf->AddCacheDefinition(cacheEntryName.c_str(), valueToUse.c_str(),
+      mf->AddCacheDefinition(cacheEntryName, valueToUse.c_str(),
                              cacheEntryName.c_str(), cmCacheManager::STRING,
                              true);
       mf->GetCacheManager()->SaveCache(mf->GetHomeOutputDirectory());
@@ -495,8 +495,8 @@ void cmExtraEclipseCDT4Generator::CreateProjectFile()
     std::string linkSourceDirectory = this->GetEclipsePath(
                                                       mf->GetStartDirectory());
     // .project dir can't be subdir of a linked resource dir
-    if (!cmSystemTools::IsSubDirectory(this->HomeOutputDirectory.c_str(),
-                                         linkSourceDirectory.c_str()))
+    if (!cmSystemTools::IsSubDirectory(this->HomeOutputDirectory,
+                                         linkSourceDirectory))
       {
       this->AppendLinkedResource(fout, sourceLinkedResourceName,
                                  this->GetEclipsePath(linkSourceDirectory),
@@ -560,7 +560,8 @@ void cmExtraEclipseCDT4Generator::CreateLinksForTargets(
           // get the files from the source lists then add them to the groups
           cmTarget* tgt = const_cast<cmTarget*>(&ti->second);
           std::vector<cmSourceFile*> files;
-          tgt->GetSourceFiles(files);
+          tgt->GetSourceFiles(files,
+                            makefile->GetSafeDefinition("CMAKE_BUILD_TYPE"));
           for(std::vector<cmSourceFile*>::const_iterator sfIt = files.begin();
               sfIt != files.end();
               sfIt++)
@@ -589,7 +590,7 @@ void cmExtraEclipseCDT4Generator::CreateLinksForTargets(
                 ++fileIt)
               {
               std::string fullPath = (*fileIt)->GetFullPath();
-              if (!cmSystemTools::FileIsDirectory(fullPath.c_str()))
+              if (!cmSystemTools::FileIsDirectory(fullPath))
                 {
                 std::string linkName4 = linkName3;
                 linkName4 += "/";
@@ -624,7 +625,7 @@ void cmExtraEclipseCDT4Generator::CreateLinksToSubprojects(
   this->AppendLinkedResource(fout, "[Subprojects]",
                              "virtual:/virtual", VirtualFolder);
 
-  for (std::map<cmStdString, std::vector<cmLocalGenerator*> >::const_iterator
+  for (std::map<std::string, std::vector<cmLocalGenerator*> >::const_iterator
        it = this->GlobalGenerator->GetProjectMap().begin();
        it != this->GlobalGenerator->GetProjectMap().end();
        ++it)
@@ -634,8 +635,8 @@ void cmExtraEclipseCDT4Generator::CreateLinksToSubprojects(
     // a linked resource must not point to a parent directory of .project or
     // .project itself
     if ((baseDir != linkSourceDirectory) &&
-        !cmSystemTools::IsSubDirectory(baseDir.c_str(),
-                                       linkSourceDirectory.c_str()))
+        !cmSystemTools::IsSubDirectory(baseDir,
+                                       linkSourceDirectory))
       {
       std::string linkName = "[Subprojects]/";
       linkName += it->first;
@@ -662,7 +663,7 @@ void cmExtraEclipseCDT4Generator::AppendIncludeDirectories(
     {
     if (!inc->empty())
       {
-      std::string dir = cmSystemTools::CollapseFullPath(inc->c_str());
+      std::string dir = cmSystemTools::CollapseFullPath(*inc);
 
       // handle framework include dirs on OSX, the remainder after the
       // Frameworks/ part has to be stripped
@@ -818,7 +819,7 @@ void cmExtraEclipseCDT4Generator::CreateCProjectFile() const
     // exlude source directory from output search path
     // - only if not named the same as an output directory
     if (!cmSystemTools::FileIsDirectory(
-           std::string(this->HomeOutputDirectory + "/" + *it).c_str()))
+           std::string(this->HomeOutputDirectory + "/" + *it)))
       {
       excludeFromOut += this->EscapeForXML(*it) + "/|";
       }
@@ -967,7 +968,7 @@ void cmExtraEclipseCDT4Generator::CreateCProjectFile() const
         continue;
         }
       std::vector<std::string> includeDirs;
-      const char *config = mf->GetDefinition("CMAKE_BUILD_TYPE");
+      std::string config = mf->GetSafeDefinition("CMAKE_BUILD_TYPE");
       (*it)->GetIncludeDirectories(includeDirs, l->second, "C", config);
       this->AppendIncludeDirectories(fout, includeDirs, emmited);
       }
@@ -981,7 +982,7 @@ void cmExtraEclipseCDT4Generator::CreateCProjectFile() const
     std::string systemIncludeDirs = mf->GetSafeDefinition(
                                 "CMAKE_EXTRA_GENERATOR_C_SYSTEM_INCLUDE_DIRS");
     std::vector<std::string> dirs;
-    cmSystemTools::ExpandListArgument(systemIncludeDirs.c_str(), dirs);
+    cmSystemTools::ExpandListArgument(systemIncludeDirs, dirs);
     this->AppendIncludeDirectories(fout, dirs, emmited);
     }
   compiler = mf->GetSafeDefinition("CMAKE_CXX_COMPILER");
@@ -990,7 +991,7 @@ void cmExtraEclipseCDT4Generator::CreateCProjectFile() const
     std::string systemIncludeDirs = mf->GetSafeDefinition(
                               "CMAKE_EXTRA_GENERATOR_CXX_SYSTEM_INCLUDE_DIRS");
     std::vector<std::string> dirs;
-    cmSystemTools::ExpandListArgument(systemIncludeDirs.c_str(), dirs);
+    cmSystemTools::ExpandListArgument(systemIncludeDirs, dirs);
     this->AppendIncludeDirectories(fout, dirs, emmited);
     }
 
@@ -1292,7 +1293,7 @@ void cmExtraEclipseCDT4Generator::AppendTarget(cmGeneratedFileStream& fout,
   std::string pathXml = cmExtraEclipseCDT4Generator::EscapeForXML(path);
   fout <<
     "<target name=\"" << prefix << targetXml << "\""
-    " path=\"" << pathXml.c_str() << "\""
+    " path=\"" << pathXml << "\""
     " targetID=\"org.eclipse.cdt.make.MakeTargetBuilder\">\n"
     "<buildCommand>"
     << cmExtraEclipseCDT4Generator::GetEclipsePath(make)

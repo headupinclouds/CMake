@@ -51,7 +51,7 @@ void cmFindCommon::SelectDefaultRootPathMode()
   std::string findRootPathVar = "CMAKE_FIND_ROOT_PATH_MODE_";
   findRootPathVar += this->CMakePathName;
   std::string rootPathMode =
-    this->Makefile->GetSafeDefinition(findRootPathVar.c_str());
+    this->Makefile->GetSafeDefinition(findRootPathVar);
   if (rootPathMode=="NEVER")
     {
     this->FindRootPathMode = RootPathModeNoRootPath;
@@ -182,9 +182,9 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
       // already inside.  Skip the unrooted path if it is relative to
       // a user home directory or is empty.
       std::string rootedDir;
-      if(cmSystemTools::IsSubDirectory(ui->c_str(), ri->c_str())
+      if(cmSystemTools::IsSubDirectory(*ui, *ri)
           || (stagePrefix
-            && cmSystemTools::IsSubDirectory(ui->c_str(), stagePrefix)))
+            && cmSystemTools::IsSubDirectory(*ui, stagePrefix)))
         {
         rootedDir = *ui;
         }
@@ -195,7 +195,7 @@ void cmFindCommon::RerootPaths(std::vector<std::string>& paths)
         rootedDir += "/";
 
         // Append the original path with its old root removed.
-        rootedDir += cmSystemTools::SplitPathRootComponent(ui->c_str());
+        rootedDir += cmSystemTools::SplitPathRootComponent(*ui);
         }
 
       // Store the new path.
@@ -361,7 +361,7 @@ void cmFindCommon::AddUserPath(std::string const& p,
   // Expand using the view of the target application.
   std::string expanded = p;
   cmSystemTools::ExpandRegistryValues(expanded, view);
-  cmSystemTools::GlobDirs(expanded.c_str(), paths);
+  cmSystemTools::GlobDirs(expanded, paths);
 
   // Executables can be either 32-bit or 64-bit, so expand using the
   // alternative view.
@@ -369,12 +369,12 @@ void cmFindCommon::AddUserPath(std::string const& p,
     {
     expanded = p;
     cmSystemTools::ExpandRegistryValues(expanded, other_view);
-    cmSystemTools::GlobDirs(expanded.c_str(), paths);
+    cmSystemTools::GlobDirs(expanded, paths);
     }
 }
 
 //----------------------------------------------------------------------------
-void cmFindCommon::AddCMakePath(const char* variable)
+void cmFindCommon::AddCMakePath(const std::string& variable)
 {
   // Get a path from a CMake variable.
   if(const char* varPath = this->Makefile->GetDefinition(variable))
@@ -428,12 +428,12 @@ void cmFindCommon::AddPathInternal(std::string const& in_path,
 
   // Convert to clean full path.
   std::string fullPath =
-    cmSystemTools::CollapseFullPath(in_path.c_str(), relbase);
+    cmSystemTools::CollapseFullPath(in_path, relbase);
 
   // Insert the path if has not already been emitted.
   if(this->SearchPathsEmitted.insert(fullPath).second)
     {
-    this->SearchPaths.push_back(fullPath.c_str());
+    this->SearchPaths.push_back(fullPath);
     }
 }
 

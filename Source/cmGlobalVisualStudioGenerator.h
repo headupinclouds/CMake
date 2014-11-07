@@ -27,11 +27,6 @@ public:
   virtual ~cmGlobalVisualStudioGenerator();
 
   /**
-   * Basic generate implementation for all VS generators.
-   */
-  virtual void Generate();
-
-  /**
    * Configure CMake's Visual Studio macros file into the user's Visual
    * Studio macros directory.
    */
@@ -88,7 +83,10 @@ public:
   virtual std::string ExpandCFGIntDir(const std::string& str,
                                       const std::string& config) const;
 
+  void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const;
 protected:
+  virtual void Generate();
+
   // Does this VS version link targets to each other if there are
   // dependencies in the SLN file?  This was done for VS versions
   // below 8.
@@ -96,26 +94,23 @@ protected:
 
   virtual const char* GetIDEVersion() = 0;
 
-  virtual void AddPlatformDefinitions(cmMakefile* mf);
-
   virtual bool ComputeTargetDepends();
-  class VSDependSet: public std::set<cmStdString> {};
+  class VSDependSet: public std::set<std::string> {};
   class VSDependMap: public std::map<cmTarget const*, VSDependSet> {};
   VSDependMap VSTargetDepends;
   void ComputeVSTargetDepends(cmTarget&);
 
-  bool CheckTargetLinks(cmTarget& target, const char* name);
-  std::string GetUtilityForTarget(cmTarget& target, const char*);
+  bool CheckTargetLinks(cmTarget& target, const std::string& name);
+  std::string GetUtilityForTarget(cmTarget& target, const std::string&);
   virtual std::string WriteUtilityDepend(cmTarget const*) = 0;
   std::string GetUtilityDepend(cmTarget const* target);
-  typedef std::map<cmTarget const*, cmStdString> UtilityDependsMap;
+  typedef std::map<cmTarget const*, std::string> UtilityDependsMap;
   UtilityDependsMap UtilityDepends;
-  const char* AdditionalPlatformDefinition;
 
 private:
   virtual std::string GetVSMakeProgram() = 0;
-  void PrintCompilerAdvice(std::ostream&, std::string, const char*) const {}
-  void ComputeTargetObjects(cmGeneratorTarget* gt) const;
+  void PrintCompilerAdvice(std::ostream&, std::string const&,
+                           const char*) const {}
 
   void FollowLinkDepends(cmTarget const* target,
                          std::set<cmTarget const*>& linked);

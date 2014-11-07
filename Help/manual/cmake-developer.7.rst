@@ -55,7 +55,7 @@ used in a comparison with the iterator returned by ``end()``:
 
 .. code-block:: c++
 
-  const std::set<cmStdString>& someSet = getSet();
+  const std::set<std::string>& someSet = getSet();
   if (someSet.find("needle") == someSet.end()) // Wrong
     {
     // ...
@@ -66,8 +66,8 @@ The return value of ``find()`` must be assigned to an intermediate
 
 .. code-block:: c++
 
-  const std::set<cmStdString>& someSet;
-  const std::set<cmStdString>::const_iterator i = someSet.find("needle");
+  const std::set<std::string>& someSet;
+  const std::set<std::string>::const_iterator i = someSet.find("needle");
   if (i != propSet.end()) // Ok
     {
     // ...
@@ -110,7 +110,7 @@ conversion is not allowed:
 
 .. code-block:: c++
 
-  std::set<cmStdString> theSet;
+  std::set<const char*> theSet;
   std::vector<std::string> theVector;
   theVector.insert(theVector.end(), theSet.begin(), theSet.end()); // Wrong
 
@@ -118,9 +118,9 @@ A loop must be used instead:
 
 .. code-block:: c++
 
-  std::set<cmStdString> theSet;
+  std::set<const char*> theSet;
   std::vector<std::string> theVector;
-  for(std::set<cmStdString>::iterator li = theSet.begin();
+  for(std::set<const char*>::iterator li = theSet.begin();
       li != theSet.end(); ++li)
     {
     theVector.push_back(*li);
@@ -188,14 +188,59 @@ size_t
 
 Various implementations have differing implementation of ``size_t``.  When
 assigning the result of ``.size()`` on a container for example, the result
-should not be assigned to an ``unsigned int`` or similar. ``std::size_t`` must
-not be used.
+should be assigned to ``size_t`` not to ``std::size_t``, ``unsigned int`` or
+similar types.
 
 Templates
 ---------
 
 Some template code is permitted, but with some limitations. Member templates
 may not be used, and template friends may not be used.
+
+Adding Compile Features
+=======================
+
+CMake reports an error if a compiler whose features are known does not report
+support for a particular requested feature.  A compiler is considered to have
+known features if it reports support for at least one feature.
+
+When adding a new compile feature to CMake, it is therefore necessary to list
+support for the feature for all CompilerIds which already have one or more
+feature supported, if the new feature is available for any version of the
+compiler.
+
+When adding the first supported feature to a particular CompilerId, it is
+necessary to list support for all features known to cmake (See
+:variable:`CMAKE_C_COMPILE_FEATURES` and
+:variable:`CMAKE_CXX_COMPILE_FEATURES` as appropriate), where available for
+the compiler.
+
+It is sensible to record the features for the most recent version of a
+particular CompilerId first, and then work backwards.  It is sensible to
+try to create a continuous range of versions of feature releases of the
+compiler.  Gaps in the range indicate incorrect features recorded for
+intermediate releases.
+
+Generally, features are made available for a particular version if the
+compiler vendor documents availability of the feature with that
+version.  Note that sometimes partially implemented features appear to
+be functional in previous releases (such as ``cxx_constexpr`` in GNU 4.6,
+though availability is documented in GNU 4.7), and sometimes compiler vendors
+document availability of features, though supporting infrastructure is
+not available (such as ``__has_feature(cxx_generic_lambdas)`` indicating
+non-availability in Clang 3.4, though it is documented as available, and
+fixed in Clang 3.5).  Similar cases for other compilers and versions
+need to be investigated when extending CMake to support them.
+
+When a vendor releases a new version of a known compiler which supports
+a previously unsupported feature, and there are already known features for
+that compiler, the feature should be listed as supported in CMake for
+that version of the compiler as soon as reasonably possible.
+
+Standard-specific/compiler-specific variables such
+``CMAKE_CXX98_COMPILE_FEATURES`` are deliberately not documented.  They
+only exist for the compiler-specific implementation of adding the ``-std``
+compile flag for compilers which need that.
 
 Help
 ====
@@ -331,10 +376,10 @@ documentation:
  See the :manual:`cmake-policies(7)` manual
  and the :command:`cmake_policy` command.
 
-``prop_cache, prop_dir, prop_gbl, prop_sf, prop_test, prop_tgt``
- A CMake cache, directory, global, source file, test, or target
- property, respectively.  See the :manual:`cmake-properties(7)` manual
- and the :command:`set_property` command.
+``prop_cache, prop_dir, prop_gbl, prop_sf, prop_inst, prop_test, prop_tgt``
+ A CMake cache, directory, global, source file, installed file, test,
+ or target property, respectively.  See the :manual:`cmake-properties(7)`
+ manual and the :command:`set_property` command.
 
 ``variable``
  A CMake language variable.
@@ -420,168 +465,196 @@ with an explicit target.
 Style
 -----
 
-1)
-  Command signatures should be marked up as plain literal blocks, not as
-  cmake ``code-blocks``.
+Style: Section Headers
+^^^^^^^^^^^^^^^^^^^^^^
 
-2)
-  Signatures are separated from preceding content by a horizontal
-  line. That is, use:
+When marking section titles, make the section decoration line as long as
+the title text.  Use only a line below the title, not above. For
+example:
 
-  .. code-block:: rst
+.. code-block:: rst
 
-    ... preceding paragraph.
+  Title Text
+  ----------
 
-    ---------------------------------------------------------------------
+Capitalize the first letter of each non-minor word in the title.
 
-    ::
+The section header underline character hierarchy is
 
-      add_library(<lib> ...)
+* ``#``: Manual group (part) in the master document
+* ``*``: Manual (chapter) title
+* ``=``: Section within a manual
+* ``-``: Subsection or `CMake Domain`_ object document title
+* ``^``: Subsubsection or `CMake Domain`_ object document section
+* ``"``: Paragraph or `CMake Domain`_ object document subsection
 
-    This signature is used for ...
+Style: Whitespace
+^^^^^^^^^^^^^^^^^
 
-3)
-  Use "``OFF``" and "``ON``" for boolean values which can be modified by
-  the user, such as :prop_tgt:`POSITION_INDEPENDENT_CODE`. Such properties
-  may be "enabled" and "disabled". Use "``True``" and "``False``" for
-  inherent values which can't be modified after being set, such as the
-  :prop_tgt:`IMPORTED` property of a build target.
+Use two spaces for indentation.  Use two spaces between sentences in
+prose.
 
-4)
-  Use two spaces for indentation.  Use two spaces between sentences in
-  prose.
+Style: Line Length
+^^^^^^^^^^^^^^^^^^
 
-5)
-  Prefer to mark the start of literal blocks with ``::`` at the end of
-  the preceding paragraph. In cases where the following block gets
-  a ``code-block`` marker, put a single ``:`` at the end of the preceding
-  paragraph.
+Prefer to restrict the width of lines to 75-80 columns.  This is not a
+hard restriction, but writing new paragraphs wrapped at 75 columns
+allows space for adding minor content without significant re-wrapping of
+content.
 
-6)
-  Prefer to restrict the width of lines to 75-80 columns.  This is not a
-  hard restriction, but writing new paragraphs wrapped at 75 columns
-  allows space for adding minor content without significant re-wrapping of
-  content.
+Style: Prose
+^^^^^^^^^^^^
 
-7)
-  Mark up self-references with  ``inline-literal`` syntax. For example,
-  within the add_executable command documentation, use
+Use American English spellings in prose.
 
-  .. code-block:: rst
+Style: Starting Literal Blocks
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    ``add_executable``
+Prefer to mark the start of literal blocks with ``::`` at the end of
+the preceding paragraph. In cases where the following block gets
+a ``code-block`` marker, put a single ``:`` at the end of the preceding
+paragraph.
 
-  not
+Style: CMake Command Signatures
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-  .. code-block:: rst
+Command signatures should be marked up as plain literal blocks, not as
+cmake ``code-blocks``.
 
-    :command:`add_executable`
+Signatures are separated from preceding content by a section header.
+That is, use:
 
-  which is used elsewhere.
+.. code-block:: rst
 
-8)
-  Mark up all other linkable references as links, including repeats. An
-  alternative, which is used by wikipedia (`<http://en.wikipedia.org/wiki/WP:REPEATLINK>`_),
-  is to link to a reference only once per article. That style is not used
-  in CMake documentation.
+  ... preceding paragraph.
 
-9)
-  Mark up references to keywords in signatures, file names, and other
-  technical terms with ``inline-literl`` syntax, for example:
+  Normal Libraries
+  ^^^^^^^^^^^^^^^^
 
-  .. code-block:: rst
+  ::
 
-    If ``WIN32`` is used with :command:`add_executable`, the
-    :prop_tgt:`WIN32_EXECUTABLE` target property is enabled. That command
-    creates the file ``<name>.exe`` on Windows.
+    add_library(<lib> ...)
 
+  This signature is used for ...
 
-10)
-  If referring to a concept which corresponds to a property, and that
-  concept is described in a high-level manual, prefer to link to the
-  manual section instead of the property. For example:
+Signatures of commands should wrap optional parts with square brackets,
+and should mark list of optional arguments with an ellipsis (``...``).
+Elements of the signature which are specified by the user should be
+specified with angle brackets, and may be referred to in prose using
+``inline-literal`` syntax.
 
-  .. code-block:: rst
+Style: Boolean Constants
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-    This command creates an :ref:`Imported Target <Imported Targets>`.
+Use "``OFF``" and "``ON``" for boolean values which can be modified by
+the user, such as :prop_tgt:`POSITION_INDEPENDENT_CODE`. Such properties
+may be "enabled" and "disabled". Use "``True``" and "``False``" for
+inherent values which can't be modified after being set, such as the
+:prop_tgt:`IMPORTED` property of a build target.
 
-  instead of:
+Style: Inline Literals
+^^^^^^^^^^^^^^^^^^^^^^
 
-  .. code-block:: rst
+Mark up references to keywords in signatures, file names, and other
+technical terms with ``inline-literal`` syntax, for example:
 
-    This command creates an :prop_tgt:`IMPORTED` target.
+.. code-block:: rst
 
-  The latter should be used only when referring specifically to the
-  property.
+  If ``WIN32`` is used with :command:`add_executable`, the
+  :prop_tgt:`WIN32_EXECUTABLE` target property is enabled. That command
+  creates the file ``<name>.exe`` on Windows.
 
-  References to manual sections are not automatically created by creating
-  a section, but code such as:
+Style: Cross-References
+^^^^^^^^^^^^^^^^^^^^^^^
 
-  .. code-block:: rst
+Mark up linkable references as links, including repeats.
+An alternative, which is used by wikipedia
+(`<http://en.wikipedia.org/wiki/WP:REPEATLINK>`_),
+is to link to a reference only once per article. That style is not used
+in CMake documentation.
 
-    .. _`Imported Targets`:
+Style: Referencing CMake Concepts
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-  creates a suitable anchor.  Use an anchor name which matches the name
-  of the corresponding section.  Refer to the anchor using a
-  cross-reference with specified text.
+If referring to a concept which corresponds to a property, and that
+concept is described in a high-level manual, prefer to link to the
+manual section instead of the property. For example:
 
-  Imported Targets need the ``IMPORTED`` term marked up with care in
-  particular because the term may refer to a command keyword
-  (``IMPORTED``), a target property (:prop_tgt:`IMPORTED`), or a
-  concept (:ref:`Imported Targets`).
+.. code-block:: rst
 
-11)
-  Where a property, command or variable is related conceptually to others,
-  by for example, being related to the buildsystem description, generator
-  expressions or Qt, each relevant property, command or variable should
-  link to the primary manual, which provides high-level information.  Only
-  particular information relating to the command should be in the
-  documentation of the command.
+  This command creates an :ref:`Imported Target <Imported Targets>`.
 
-12)
-  When marking section titles, make the section decoration line as long as
-  the title text.  Use only a line below the title, not above. For
-  example:
+instead of:
 
-  .. code-block:: rst
+.. code-block:: rst
 
-    Title Text
-    ----------
+  This command creates an :prop_tgt:`IMPORTED` target.
 
-  Capitalize the first letter of each non-minor word in the title.
+The latter should be used only when referring specifically to the
+property.
 
-13)
-  When referring to properties, variables, commands etc, prefer to link
-  to the target object and follow that with the type of object it is.
-  For example:
+References to manual sections are not automatically created by creating
+a section, but code such as:
 
-  .. code-block:: rst
+.. code-block:: rst
 
-    Set the :prop_tgt:`AUTOMOC` target property to ``ON``.
+  .. _`Imported Targets`:
 
-  Instead of
+creates a suitable anchor.  Use an anchor name which matches the name
+of the corresponding section.  Refer to the anchor using a
+cross-reference with specified text.
 
-  .. code-block:: rst
+Imported Targets need the ``IMPORTED`` term marked up with care in
+particular because the term may refer to a command keyword
+(``IMPORTED``), a target property (:prop_tgt:`IMPORTED`), or a
+concept (:ref:`Imported Targets`).
 
-    Set the target property :prop_tgt:`AUTOMOC` to ``ON``.
+Where a property, command or variable is related conceptually to others,
+by for example, being related to the buildsystem description, generator
+expressions or Qt, each relevant property, command or variable should
+link to the primary manual, which provides high-level information.  Only
+particular information relating to the command should be in the
+documentation of the command.
 
-  The ``policy`` directive is an exception, and the type us usually
-  referred to before the link:
+Style: Referencing CMake Domain Objects
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-  .. code-block:: rst
+When referring to `CMake Domain`_ objects such as properties, variables,
+commands etc, prefer to link to the target object and follow that with
+the type of object it is.  For example:
 
-    If policy :prop_tgt:`CMP0022` is set to ``NEW`` the behavior is ...
+.. code-block:: rst
 
-14)
-  Signatures of commands should wrap optional parts with square brackets,
-  and should mark list of optional arguments with an ellipsis (``...``).
-  Elements of the signature which are specified by the user should be
-  specified with angle brackets, and may be referred to in prose using
-  ``inline-literal`` syntax.
+  Set the :prop_tgt:`AUTOMOC` target property to ``ON``.
 
-15)
-  Use American English spellings in prose.
+Instead of
 
+.. code-block:: rst
+
+  Set the target property :prop_tgt:`AUTOMOC` to ``ON``.
+
+The ``policy`` directive is an exception, and the type us usually
+referred to before the link:
+
+.. code-block:: rst
+
+  If policy :prop_tgt:`CMP0022` is set to ``NEW`` the behavior is ...
+
+However, markup self-references with ``inline-literal`` syntax.
+For example, within the :command:`add_executable` command
+documentation, use
+
+.. code-block:: rst
+
+  ``add_executable``
+
+not
+
+.. code-block:: rst
+
+  :command:`add_executable`
+
+which is used elsewhere.
 
 Modules
 =======
@@ -664,213 +737,409 @@ For example, a ``Modules/Findxxx.cmake`` module may contain:
    <code>
  endmacro()
 
+After the top documentation block, leave a *BLANK* line, and then add a
+copyright and licence notice block like this one (change only the year
+range and name)
+
+.. code-block:: cmake
+
+  #=============================================================================
+  # Copyright 2009-2011 Your Name
+  #
+  # Distributed under the OSI-approved BSD License (the "License");
+  # see accompanying file Copyright.txt for details.
+  #
+  # This software is distributed WITHOUT ANY WARRANTY; without even the
+  # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+  # See the License for more information.
+  #=============================================================================
+  # (To distribute this file outside of CMake, substitute the full
+  #  License text for the above reference.)
+
+Test the documentation formatting by running
+``cmake --help-module <module-name>``, and also by enabling the
+``SPHINX_HTML`` and ``SPHINX_MAN`` options to build the documentation.
+Edit the comments until generated documentation looks satisfactory.  To
+have a .cmake file in this directory NOT show up in the modules
+documentation, simply leave out the ``Help/module/<module-name>.rst``
+file and the ``Help/manual/cmake-modules.7.rst`` toctree entry.
+
+
 Find Modules
 ------------
 
 A "find module" is a ``Modules/Find<package>.cmake`` file to be loaded
 by the :command:`find_package` command when invoked for ``<package>``.
 
-We would like all ``FindXxx.cmake`` files to produce consistent variable
-names.  Please use the following consistent variable names for general use.
+The primary task of a find module is to determine whether a package
+exists on the system, set the ``<package>_FOUND`` variable to reflect
+this and provide any variables, macros and imported targets required to
+use the package.
 
-Xxx_INCLUDE_DIRS
- The final set of include directories listed in one variable for use by client
- code.  This should not be a cache entry.
+The traditional approach is to use variables for everything, including
+libraries and executables: see the `Standard Variable Names`_ section
+below.  This is what most of the existing find modules provided by CMake
+do.
 
-Xxx_LIBRARIES
- The libraries to link against to use Xxx. These should include full paths.
- This should not be a cache entry.
+The more modern approach is to behave as much like
+``<package>Config.cmake`` files as possible, by providing imported
+targets.  As well as matching how ``*Config.cmake`` files work, the
+libraries, include directories and compile definitions are all set just
+by using the target in a :command:`target_link_libraries` call.   The
+disadvantage is that ``*Config.cmake`` files of projects that use
+imported targets from find modules may require more work to make sure
+those imported targets that are in the link interface are available.
 
-Xxx_DEFINITIONS
- Definitions to use when compiling code that uses Xxx. This really shouldn't
- include options such as (-DHAS_JPEG)that a client source-code file uses to
- decide whether to #include <jpeg.h>
+In either case (or even when providing both variables and imported
+targets), find modules should provide backwards compatibility with old
+versions that had the same name.
 
-Xxx_EXECUTABLE
- Where to find the Xxx tool.
+A FindFoo.cmake module will typically be loaded by the command::
 
-Xxx_Yyy_EXECUTABLE
- Where to find the Yyy tool that comes with Xxx.
+  find_package(Foo [major[.minor[.patch[.tweak]]]]
+               [EXACT] [QUIET] [REQUIRED]
+               [[COMPONENTS] [components...]]
+               [OPTIONAL_COMPONENTS components...]
+               [NO_POLICY_SCOPE])
 
-Xxx_LIBRARY_DIRS
- Optionally, the final set of library directories listed in one variable for
- use by client code.  This should not be a cache entry.
+See the :command:`find_package` documentation for details on what
+variables are set for the find module.  Most of these are dealt with by
+using :module:`FindPackageHandleStandardArgs`.
 
-Xxx_ROOT_DIR
- Where to find the base directory of Xxx.
+Briefly, the module should only locate versions of the package
+compatible with the requested version, as described by the
+``Foo_FIND_VERSION`` family of variables.  If ``Foo_FIND_QUIETLY`` is
+set to true, it should avoid printing messages, including anything
+complaining about the package not being found.  If ``Foo_FIND_REQUIRED``
+is set to true, the module should issue a ``FATAL_ERROR`` if the package
+cannot be found.  If neither are set to true, it should print a
+non-fatal message if it cannot find the package.
 
-Xxx_VERSION_Yy
- Expect Version Yy if true. Make sure at most one of these is ever true.
+Packages that find multiple semi-independent parts (like bundles of
+libraries) should search for the components listed in
+``Foo_FIND_COMPONENTS`` if it is set , and only set ``Foo_FOUND`` to
+true if for each searched-for component ``<c>`` that was not found,
+``Foo_FIND_REQUIRED_<c>`` is not set to true.  The ``HANDLE_COMPONENTS``
+argument of ``find_package_handle_standard_args()`` can be used to
+implement this.
 
-Xxx_WRAP_Yy
- If False, do not try to use the relevant CMake wrapping command.
+If ``Foo_FIND_COMPONENTS`` is not set, which modules are searched for
+and required is up to the find module, but should be documented.
 
-Xxx_Yy_FOUND
- If False, optional Yy part of Xxx sytem is not available.
+For internal implementation, it is a generally accepted convention that
+variables starting with underscore are for temporary use only.
 
-Xxx_FOUND
- Set to false, or undefined, if we haven't found, or don't want to use Xxx.
+Like all modules, find modules should be properly documented.  To add a
+module to the CMake documentation, follow the steps in the `Module
+Documentation`_ section above.
 
-Xxx_NOT_FOUND_MESSAGE
- Should be set by config-files in the case that it has set Xxx_FOUND to FALSE.
- The contained message will be printed by the find_package() command and by
- find_package_handle_standard_args() to inform the user about the problem.
 
-Xxx_RUNTIME_LIBRARY_DIRS
- Optionally, the runtime library search path for use when running an
- executable linked to shared libraries.  The list should be used by user code
- to create the PATH on windows or LD_LIBRARY_PATH on unix.  This should not be
- a cache entry.
 
-Xxx_VERSION_STRING
- A human-readable string containing the version of the package found, if any.
+Standard Variable Names
+^^^^^^^^^^^^^^^^^^^^^^^
 
-Xxx_VERSION_MAJOR
- The major version of the package found, if any.
+For a ``FindXxx.cmake`` module that takes the approach of setting
+variables (either instead of or in addition to creating imported
+targets), the following variable names should be used to keep things
+consistent between find modules.  Note that all variables start with
+``Xxx_`` to make sure they do not interfere with other find modules; the
+same consideration applies to macros, functions and imported targets.
 
-Xxx_VERSION_MINOR
- The minor version of the package found, if any.
+``Xxx_INCLUDE_DIRS``
+  The final set of include directories listed in one variable for use by
+  client code.  This should not be a cache entry.
 
-Xxx_VERSION_PATCH
- The patch version of the package found, if any.
+``Xxx_LIBRARIES``
+  The libraries to link against to use Xxx. These should include full
+  paths.  This should not be a cache entry.
 
-You do not have to provide all of the above variables. You should provide
-Xxx_FOUND under most circumstances.  If Xxx is a library, then Xxx_LIBRARIES,
-should also be defined, and Xxx_INCLUDE_DIRS should usually be defined (I
-guess libm.a might be an exception)
+``Xxx_DEFINITIONS``
+  Definitions to use when compiling code that uses Xxx. This really
+  shouldn't include options such as ``-DHAS_JPEG`` that a client
+  source-code file uses to decide whether to ``#include <jpeg.h>``
+
+``Xxx_EXECUTABLE``
+  Where to find the Xxx tool.
+
+``Xxx_Yyy_EXECUTABLE``
+  Where to find the Yyy tool that comes with Xxx.
+
+``Xxx_LIBRARY_DIRS``
+  Optionally, the final set of library directories listed in one
+  variable for use by client code.  This should not be a cache entry.
+
+``Xxx_ROOT_DIR``
+  Where to find the base directory of Xxx.
+
+``Xxx_VERSION_Yy``
+  Expect Version Yy if true. Make sure at most one of these is ever true.
+
+``Xxx_WRAP_Yy``
+  If False, do not try to use the relevant CMake wrapping command.
+
+``Xxx_Yy_FOUND``
+  If False, optional Yy part of Xxx sytem is not available.
+
+``Xxx_FOUND``
+  Set to false, or undefined, if we haven't found, or don't want to use
+  Xxx.
+
+``Xxx_NOT_FOUND_MESSAGE``
+  Should be set by config-files in the case that it has set
+  ``Xxx_FOUND`` to FALSE.  The contained message will be printed by the
+  :command:`find_package` command and by
+  ``find_package_handle_standard_args()`` to inform the user about the
+  problem.
+
+``Xxx_RUNTIME_LIBRARY_DIRS``
+  Optionally, the runtime library search path for use when running an
+  executable linked to shared libraries.  The list should be used by
+  user code to create the ``PATH`` on windows or ``LD_LIBRARY_PATH`` on
+  UNIX.  This should not be a cache entry.
+
+``Xxx_VERSION``
+  The full version string of the package found, if any.  Note that many
+  existing modules provide ``Xxx_VERSION_STRING`` instead.
+
+``Xxx_VERSION_MAJOR``
+  The major version of the package found, if any.
+
+``Xxx_VERSION_MINOR``
+  The minor version of the package found, if any.
+
+``Xxx_VERSION_PATCH``
+  The patch version of the package found, if any.
 
 The following names should not usually be used in CMakeLists.txt files, but
-they may be usefully modified in users' CMake Caches to control stuff.
+are typically cache variables for users to edit and control the
+behaviour of find modules (like entering the path to a library manually)
 
-Xxx_LIBRARY
- Name of Xxx Library. A User may set this and Xxx_INCLUDE_DIR to ignore to
- force non-use of Xxx.
+``Xxx_LIBRARY``
+  The path of the Xxx library (as used with :command:`find_library`, for
+  example).
 
-Xxx_Yy_LIBRARY
- Name of Yy library that is part of the Xxx system. It may or may not be
- required to use Xxx.
+``Xxx_Yy_LIBRARY``
+  The path of the Yy library that is part of the Xxx system. It may or
+  may not be required to use Xxx.
 
-Xxx_INCLUDE_DIR
- Where to find xxx.h, etc.  (Xxx_INCLUDE_PATH was considered bad because a path
- includes an actual filename.)
+``Xxx_INCLUDE_DIR``
+  Where to find headers for using the Xxx library.
 
-Xxx_Yy_INCLUDE_DIR
- Where to find xxx_yy.h, etc.
+``Xxx_Yy_INCLUDE_DIR``
+  Where to find headers for using the Yy library of the Xxx system.
 
-For tidiness's sake, try to keep as many options as possible out of the cache,
-leaving at least one option which can be used to disable use of the module, or
-locate a not-found library (e.g. Xxx_ROOT_DIR).  For the same reason, mark
+To prevent users being overwhelmed with settings to configure, try to
+keep as many options as possible out of the cache, leaving at least one
+option which can be used to disable use of the module, or locate a
+not-found library (e.g. ``Xxx_ROOT_DIR``).  For the same reason, mark
 most cache options as advanced.
 
-If you need other commands to do special things then it should still begin
-with ``Xxx_``. This gives a sort of namespace effect and keeps things tidy for the
-user. You should put comments describing all the exported settings, plus
-descriptions of any the users can use to control stuff.
+While these are the standard variable names, you should provide
+backwards compatibility for any old names that were actually in use.
+Make sure you comment them as deprecated, so that no-one starts using
+them.
 
-You really should also provide backwards compatibility any old settings that
-were actually in use.  Make sure you comment them as deprecated, so that
-no-one starts using them.
 
-To add a module to the CMake documentation, follow the steps in the
-`Module Documentation`_ section above.  Test the documentation formatting
-by running ``cmake --help-module FindXxx``, and also by enabling the
-``SPHINX_HTML`` and ``SPHINX_MAN`` options to build the documentation.
-Edit the comments until generated documentation looks satisfactory.
-To have a .cmake file in this directory NOT show up in the modules
-documentation, simply leave out the ``Help/module/<module-name>.rst`` file
-and the ``Help/manual/cmake-modules.7.rst`` toctree entry.
 
-After the documentation, leave a *BLANK* line, and then add a
-copyright and licence notice block like this one::
+A Sample Find Module
+^^^^^^^^^^^^^^^^^^^^
 
- #=============================================================================
- # Copyright 2009-2011 Your Name
- #
- # Distributed under the OSI-approved BSD License (the "License");
- # see accompanying file Copyright.txt for details.
- #
- # This software is distributed WITHOUT ANY WARRANTY; without even the
- # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- # See the License for more information.
- #=============================================================================
- # (To distribute this file outside of CMake, substitute the full
- #  License text for the above reference.)
+We will describe how to create a simple find module for a library
+``Foo``.
 
-The layout of the notice block is strictly enforced by the ``ModuleNotices``
-test.  Only the year range and name may be changed freely.
+The first thing that is needed is documentation.  CMake's documentation
+system requires you to start the file with a documentation marker and
+the name of the module.  You should follow this with a simple statement
+of what the module does.
 
-A FindXxx.cmake module will typically be loaded by the command::
+.. code-block:: cmake
 
- FIND_PACKAGE(Xxx [major[.minor[.patch[.tweak]]]] [EXACT]
-              [QUIET] [[REQUIRED|COMPONENTS] [components...]])
+  #.rst:
+  # FindFoo
+  # -------
+  #
+  # Finds the Foo library
+  #
 
-If any version numbers are given to the command it will set the following
-variables before loading the module:
+More description may be required for some packages.  If there are
+caveats or other details users of the module should be aware of, you can
+add further paragraphs below this.  Then you need to document what
+variables and imported targets are set by the module, such as
 
-Xxx_FIND_VERSION
- full requested version string
+.. code-block:: cmake
 
-Xxx_FIND_VERSION_MAJOR
- major version if requested, else 0
+  # This will define the following variables::
+  #
+  #   Foo_FOUND    - True if the system has the Foo library
+  #   Foo_VERSION  - The version of the Foo library which was found
+  #
+  # and the following imported targets::
+  #
+  #   Foo::Foo   - The Foo library
 
-Xxx_FIND_VERSION_MINOR
- minor version if requested, else 0
+If the package provides any macros, they should be listed here, but can
+be documented where they are defined.  See the `Module
+Documentation`_ section above for more details.
 
-Xxx_FIND_VERSION_PATCH
- patch version if requested, else 0
+After the documentation, leave a blank line, and then add a copyright and
+licence notice block
 
-Xxx_FIND_VERSION_TWEAK
- tweak version if requested, else 0
+.. code-block:: cmake
 
-Xxx_FIND_VERSION_COUNT
- number of version components, 0 to 4
+  #=============================================================================
+  # Copyright 2009-2011 Your Name
+  #
+  # Distributed under the OSI-approved BSD License (the "License");
+  # see accompanying file Copyright.txt for details.
+  #
+  # This software is distributed WITHOUT ANY WARRANTY; without even the
+  # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+  # See the License for more information.
+  #=============================================================================
+  # (To distribute this file outside of CMake, substitute the full
+  #  License text for the above reference.)
 
-Xxx_FIND_VERSION_EXACT
- true if EXACT option was given
+If the module is new to CMake, you may want to provide a warning for
+projects that do not require a high enough CMake version.
 
-If the find module supports versioning it should locate a version of
-the package that is compatible with the version requested.  If a
-compatible version of the package cannot be found the module should
-not report success.  The version of the package found should be stored
-in "Xxx_VERSION..." version variables documented by the module.
+.. code-block:: cmake
 
-If the QUIET option is given to the command it will set the variable
-Xxx_FIND_QUIETLY to true before loading the FindXxx.cmake module.  If
-this variable is set the module should not complain about not being
-able to find the package.  If the
-REQUIRED option is given to the command it will set the variable
-Xxx_FIND_REQUIRED to true before loading the FindXxx.cmake module.  If
-this variable is set the module should issue a FATAL_ERROR if the
-package cannot be found.
-If neither the QUIET nor REQUIRED options are given then the
-FindXxx.cmake module should look for the package and complain without
-error if the module is not found.
+  if(CMAKE_MINIMUM_REQUIRED_VERSION VERSION_LESS 3.0.0)
+    message(AUTHOR_WARNING
+      "Your project should require at least CMake 3.0.0 to use FindFoo.cmake")
+  endif()
 
-FIND_PACKAGE() will set the variable CMAKE_FIND_PACKAGE_NAME to
-contain the actual name of the package.
+Now the actual libraries and so on have to be found.  The code here will
+obviously vary from module to module (dealing with that, after all, is the
+point of find modules), but there tends to be a common pattern for libraries.
 
-A package can provide sub-components.
-Those components can be listed after the COMPONENTS (or REQUIRED) or
-OPTIONAL_COMPONENTS keywords.  The set of all listed components will be
-specified in a Xxx_FIND_COMPONENTS variable.
-For each package-specific component, say Yyy, a variable Xxx_FIND_REQUIRED_Yyy
-will be set to true if it listed after COMPONENTS and it will be set to false
-if it was listed after OPTIONAL_COMPONENTS.
-Using those variables a FindXxx.cmake module and also a XxxConfig.cmake
-package configuration file can determine whether and which components have
-been requested, and whether they were requested as required or as optional.
-For each of the requested components a Xxx_Yyy_FOUND variable should be set
-accordingly.
-The per-package Xxx_FOUND variable should be only set to true if all requested
-required components have been found. A missing optional component should not
-keep the Xxx_FOUND variable from being set to true.
-If the package provides Xxx_INCLUDE_DIRS and Xxx_LIBRARIES variables, the
-include dirs and libraries for all components which were requested and which
-have been found should be added to those two variables.
+First, we try to use ``pkg-config`` to find the library.  Note that we
+cannot rely on this, as it may not be available, but it provides a good
+starting point.
 
-To get this behavior you can use the FIND_PACKAGE_HANDLE_STANDARD_ARGS()
-macro, as an example see FindJPEG.cmake.
+.. code-block:: cmake
 
-For internal implementation, it's a generally accepted convention that
-variables starting with underscore are for temporary use only. (variable
-starting with an underscore are not intended as a reserved prefix).
+  find_package(PkgConfig)
+  pkg_check_modules(PC_Foo QUIET Foo)
+
+This should define some variables starting ``PC_Foo_`` that contain the
+information from the ``Foo.pc`` file.
+
+Now we need to find the libraries and include files; we use the
+information from ``pkg-config`` to provide hints to CMake about where to
+look.
+
+.. code-block:: cmake
+
+  find_path(Foo_INCLUDE_DIR
+    NAMES foo.h
+    PATHS ${PC_Foo_INCLUDE_DIRS}
+    # if you need to put #include <Foo/foo.h> in your code, add:
+    PATH_SUFFIXES Foo
+  )
+  find_library(Foo_LIBRARY
+    NAMES foo
+    PATHS ${PC_Foo_LIBRARY_DIRS}
+  )
+
+If you have a good way of getting the version (from a header file, for
+example), you can use that information to set ``Foo_VERSION`` (although
+note that find modules have traditionally used ``Foo_VERSION_STRING``,
+so you may want to set both).  Otherwise, attempt to use the information
+from ``pkg-config``
+
+.. code-block:: cmake
+
+  set(Foo_VERSION ${PC_Foo_VERSION})
+
+Now we can use :module:`FindPackageHandleStandardArgs` to do most of the
+rest of the work for us
+
+.. code-block:: cmake
+
+  include(FindPackageHandleStandardArgs)
+  find_package_handle_standard_args(Foo
+    FOUND_VAR Foo_FOUND
+    REQUIRED_VARS
+      Foo_LIBRARY
+      Foo_INCLUDE_DIR
+    VERSION_VAR Foo_VERSION
+  )
+
+This will check that the ``REQUIRED_VARS`` contain values (that do not
+end in ``-NOTFOUND``) and set ``Foo_FOUND`` appropriately.  It will also
+cache those values.  If ``Foo_VERSION`` is set, and a required version
+was passed to :command:`find_package`, it will check the requested version
+against the one in ``Foo_VERSION``.  It will also print messages as
+appropriate; note that if the package was found, it will print the
+contents of the first required variable to indicate where it was found.
+
+At this point, we have to provide a way for users of the find module to
+link to the library or libraries that were found.  There are two
+approaches, as discussed in the `Find Modules`_ section above.  The
+traditional variable approach looks like
+
+.. code-block:: cmake
+
+  if(Foo_FOUND)
+    set(Foo_LIBRARIES ${Foo_LIBRARY})
+    set(Foo_INCLUDE_DIRS ${Foo_INCLUDE_DIR})
+    set(Foo_DEFINITIONS ${PC_Foo_CFLAGS_OTHER})
+  endif()
+
+If more than one library was found, all of them should be included in
+these variables (see the `Standard Variable Names`_ section for more
+information).
+
+When providing imported targets, these should be namespaced (hence the
+``Foo::`` prefix); CMake will recognize that values passed to
+:command:`target_link_libraries` that contain ``::`` in their name are
+supposed to be imported targets (rather than just library names), and
+will produce appropriate diagnostic messages if that target does not
+exist (see policy :policy:`CMP0028`).
+
+.. code-block:: cmake
+
+  if(Foo_FOUND AND NOT TARGET Foo::Foo)
+    add_library(Foo::Foo UNKNOWN IMPORTED)
+    set_target_properties(Foo::Foo PROPERTIES
+      IMPORTED_LOCATION "${Foo_LIBRARY}"
+      INTERFACE_COMPILE_OPTIONS "${PC_Foo_CFLAGS_OTHER}"
+      INTERFACE_INCLUDE_DIRECTORIES "${Foo_INCLUDE_DIR}"
+    )
+  endif()
+
+One thing to note about this is that the ``INTERFACE_INCLUDE_DIRECTORIES`` and
+similar properties should only contain information about the target itself, and
+not any of its dependencies.  Instead, those dependencies should also be
+targets, and CMake should be told that they are dependencies of this target.
+CMake will then combine all the necessary information automatically.
+
+We should also provide some information about the package, such as where to
+download it.
+
+.. code-block:: cmake
+
+  include(FeatureSummary)
+  set_package_properties(Foo PROPERTIES
+    URL "http://www.foo.example.com/"
+    DESCRIPTION "A library for doing useful things"
+  )
+
+Most of the cache variables should be hidden in the ``ccmake`` interface unless
+the user explicitly asks to edit them.
+
+.. code-block:: cmake
+
+  mark_as_advanced(
+    Foo_INCLUDE_DIR
+    Foo_LIBRARY
+  )
+
+If this module replaces an older version, you should set compatibility variables
+to cause the least disruption possible.
+
+.. code-block:: cmake
+
+  # compatibility variables
+  set(Foo_VERSION_STRING ${Foo_VERSION})

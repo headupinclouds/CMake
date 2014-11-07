@@ -19,16 +19,20 @@
 #include <cmsys/Encoding.hxx>
 
 cmGlobalVisualStudio7Generator::cmGlobalVisualStudio7Generator(
-  const char* platformName)
+  const std::string& platformName)
 {
   this->IntelProjectVersion = 0;
   this->DevEnvCommandInitialized = false;
+  this->MasmEnabled = false;
 
-  if (!platformName)
+  if (platformName.empty())
     {
-    platformName = "Win32";
+    this->DefaultPlatformName = "Win32";
     }
-  this->PlatformName = platformName;
+  else
+    {
+    this->DefaultPlatformName = platformName;
+    }
 }
 
 cmGlobalVisualStudio7Generator::~cmGlobalVisualStudio7Generator()
@@ -77,7 +81,6 @@ void cmGlobalVisualStudio7Generator
 {
   mf->AddDefinition("CMAKE_GENERATOR_RC", "rc");
   mf->AddDefinition("CMAKE_GENERATOR_NO_COMPILER_ENV", "1");
-  this->AddPlatformDefinitions(mf);
   if(!mf->GetDefinition("CMAKE_CONFIGURATION_TYPES"))
     {
     mf->AddCacheDefinition(
@@ -183,11 +186,11 @@ const char* cmGlobalVisualStudio7Generator::ExternalProjectType(
 //----------------------------------------------------------------------------
 void cmGlobalVisualStudio7Generator::GenerateBuildCommand(
   std::vector<std::string>& makeCommand,
-  const char* makeProgram,
-  const char* projectName,
-  const char* /*projectDir*/,
-  const char* targetName,
-  const char* config,
+  const std::string& makeProgram,
+  const std::string& projectName,
+  const std::string& /*projectDir*/,
+  const std::string& targetName,
+  const std::string& config,
   bool /*fast*/,
   std::vector<std::string> const& makeOptions)
 {
@@ -208,11 +211,12 @@ void cmGlobalVisualStudio7Generator::GenerateBuildCommand(
   makeCommand.push_back(makeProgramSelected);
 
   makeCommand.push_back(std::string(projectName) + ".sln");
+  std::string realTarget = targetName;
   bool clean = false;
-  if ( targetName && strcmp(targetName, "clean") == 0 )
+  if ( realTarget == "clean" )
     {
     clean = true;
-    targetName = "ALL_BUILD";
+    realTarget = "ALL_BUILD";
     }
   if(clean)
     {
@@ -223,7 +227,7 @@ void cmGlobalVisualStudio7Generator::GenerateBuildCommand(
     makeCommand.push_back("/build");
     }
 
-  if(config && strlen(config))
+  if(!config.empty())
     {
     makeCommand.push_back(config);
     }
@@ -233,9 +237,9 @@ void cmGlobalVisualStudio7Generator::GenerateBuildCommand(
     }
   makeCommand.push_back("/project");
 
-  if (targetName && strlen(targetName))
+  if (!realTarget.empty())
     {
-    makeCommand.push_back(targetName);
+    makeCommand.push_back(realTarget);
     }
   else
     {
@@ -256,12 +260,38 @@ cmLocalGenerator *cmGlobalVisualStudio7Generator::CreateLocalGenerator()
 }
 
 //----------------------------------------------------------------------------
-void cmGlobalVisualStudio7Generator::AddPlatformDefinitions(cmMakefile* mf)
+std::string const& cmGlobalVisualStudio7Generator::GetPlatformName() const
 {
-  cmGlobalVisualStudioGenerator::AddPlatformDefinitions(mf);
-  mf->AddDefinition("CMAKE_VS_PLATFORM_NAME", this->GetPlatformName());
+  if(!this->GeneratorPlatform.empty())
+    {
+    return this->GeneratorPlatform;
+    }
+  return this->DefaultPlatformName;
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio7Generator::SetSystemName(std::string const& s,
+                                                   cmMakefile* mf)
+{
   mf->AddDefinition("CMAKE_VS_INTEL_Fortran_PROJECT_VERSION",
                     this->GetIntelProjectVersion());
+  return this->cmGlobalVisualStudioGenerator::SetSystemName(s, mf);
+}
+
+//----------------------------------------------------------------------------
+bool cmGlobalVisualStudio7Generator::SetGeneratorPlatform(std::string const& p,
+                                                          cmMakefile* mf)
+{
+  if(this->GetPlatformName() == "x64")
+    {
+    mf->AddDefinition("CMAKE_FORCE_WIN64", "TRUE");
+    }
+  else if(this->GetPlatformName() == "Itanium")
+    {
+    mf->AddDefinition("CMAKE_FORCE_IA64", "TRUE");
+    }
+  mf->AddDefinition("CMAKE_VS_PLATFORM_NAME", this->GetPlatformName().c_str());
+  return this->cmGlobalVisualStudioGenerator::SetGeneratorPlatform(p, mf);
 }
 
 void cmGlobalVisualStudio7Generator::GenerateConfigurations(cmMakefile* mf)
@@ -352,7 +382,7 @@ void cmGlobalVisualStudio7Generator
 // output the SLN file
 void cmGlobalVisualStudio7Generator::OutputSLNFile()
 {
-  std::map<cmStdString, std::vector<cmLocalGenerator*> >::iterator it;
+  std::map<std::string, std::vector<cmLocalGenerator*> >::iterator it;
   for(it = this->ProjectMap.begin(); it!= this->ProjectMap.end(); ++it)
     {
     this->OutputSLNFile(it->second[0], it->second);
@@ -362,7 +392,6 @@ void cmGlobalVisualStudio7Generator::OutputSLNFile()
 
 void cmGlobalVisualStudio7Generator::WriteTargetConfigurations(
   std::ostream& fout,
-  cmLocalGenerator* root,
   OrderedTargetDependSet const& projectTargets)
 {
   // loop over again and write out configurations for each target
@@ -380,15 +409,15 @@ void cmGlobalVisualStudio7Generator::WriteTargetConfigurations(
       {
       std::set<std::string> allConfigurations(this->Configurations.begin(),
                                               this->Configurations.end());
+      const char* mapping = target->GetProperty("VS_PLATFORM_MAPPING");
       this->WriteProjectConfigurations(
-        fout, target->GetName(), target->GetType(),
-        allConfigurations, target->GetProperty("VS_PLATFORM_MAPPING"));
+        fout, target->GetName().c_str(), target->GetType(),
+        allConfigurations, mapping ? mapping : "");
       }
     else
       {
       const std::set<std::string>& configsPartOfDefaultBuild =
-        this->IsPartOfDefaultBuild(root->GetMakefile()->GetProjectName(),
-                                   target);
+        this->IsPartOfDefaultBuild(projectTargets, target);
       const char *vcprojName =
         target->GetProperty("GENERATOR_FILE_NAME");
       if (vcprojName)
@@ -574,7 +603,7 @@ void cmGlobalVisualStudio7Generator
 
   // Write out the configurations for all the targets in the project
   fout << "\tGlobalSection(ProjectConfiguration) = postSolution\n";
-  this->WriteTargetConfigurations(fout, root, orderedProjectTargets);
+  this->WriteTargetConfigurations(fout, orderedProjectTargets);
   fout << "\tEndGlobalSection\n";
 
   // Write out global sections
@@ -653,7 +682,7 @@ cmGlobalVisualStudio7Generator::ConvertToSolutionPath(const char* path)
 // Note, that dependencies from executables to
 // the libraries it uses are also done here
 void cmGlobalVisualStudio7Generator::WriteProject(std::ostream& fout,
-                               const char* dspname,
+                               const std::string& dspname,
                                const char* dir, cmTarget const& target)
 {
    // check to see if this is a fortran build
@@ -693,7 +722,7 @@ void cmGlobalVisualStudio7Generator::WriteProject(std::ostream& fout,
 void
 cmGlobalVisualStudio7Generator
 ::WriteProjectDepends(std::ostream& fout,
-                      const char* dspname,
+                      const std::string& dspname,
                       const char*, cmTarget const& target)
 {
   int depcount = 0;
@@ -729,12 +758,12 @@ cmGlobalVisualStudio7Generator
 // executables to the libraries it uses are also done here
 void cmGlobalVisualStudio7Generator
 ::WriteProjectConfigurations(
-  std::ostream& fout, const char* name, cmTarget::TargetType,
+  std::ostream& fout, const std::string& name, cmTarget::TargetType,
   const std::set<std::string>& configsPartOfDefaultBuild,
-  const char* platformMapping)
+  const std::string& platformMapping)
 {
-  const char* platformName =
-    platformMapping ? platformMapping : this->GetPlatformName();
+  const std::string& platformName =
+    !platformMapping.empty() ? platformMapping : this->GetPlatformName();
   std::string guid = this->GetGUID(name);
   for(std::vector<std::string>::iterator i = this->Configurations.begin();
       i != this->Configurations.end(); ++i)
@@ -757,12 +786,11 @@ void cmGlobalVisualStudio7Generator
 // Note, that dependencies from executables to
 // the libraries it uses are also done here
 void cmGlobalVisualStudio7Generator::WriteExternalProject(std::ostream& fout,
-                               const char* name,
+                               const std::string& name,
                                const char* location,
                                const char* typeGuid,
-                               const std::set<cmStdString>&)
+                               const std::set<std::string>&)
 {
-  std::string d = cmSystemTools::ConvertToOutputPath(location);
   fout << "Project("
        << "\"{"
        << (typeGuid ? typeGuid : this->ExternalProjectType(location))
@@ -868,7 +896,8 @@ cmGlobalVisualStudio7Generator::WriteUtilityDepend(cmTarget const* target)
   std::string guid = this->GetGUID(pname.c_str());
 
   fout <<
-    "<?xml version=\"1.0\" encoding = \"Windows-1252\"?>\n"
+    "<?xml version=\"1.0\" encoding = \""
+    << this->Encoding() << "\"?>\n"
     "<VisualStudioProject\n"
     "\tProjectType=\"Visual C++\"\n"
     "\tVersion=\"" << this->GetIDEVersion() << "0\"\n"
@@ -907,7 +936,7 @@ cmGlobalVisualStudio7Generator::WriteUtilityDepend(cmTarget const* target)
   return pname;
 }
 
-std::string cmGlobalVisualStudio7Generator::GetGUID(const char* name)
+std::string cmGlobalVisualStudio7Generator::GetGUID(const std::string& name)
 {
   std::string guidStoreName = name;
   guidStoreName += "_GUID_CMAKE";
@@ -918,12 +947,12 @@ std::string cmGlobalVisualStudio7Generator::GetGUID(const char* name)
     return std::string(storedGUID);
     }
   cmSystemTools::Error("Unknown Target referenced : ",
-                       name);
+                       name.c_str());
   return "";
 }
 
 
-void cmGlobalVisualStudio7Generator::CreateGUID(const char* name)
+void cmGlobalVisualStudio7Generator::CreateGUID(const std::string& name)
 {
   std::string guidStoreName = name;
   guidStoreName += "_GUID_CMAKE";
@@ -960,12 +989,12 @@ void cmGlobalVisualStudio7Generator
 //----------------------------------------------------------------------------
 void
 cmGlobalVisualStudio7Generator
-::AppendDirectoryForConfig(const char* prefix,
-                           const char* config,
-                           const char* suffix,
+::AppendDirectoryForConfig(const std::string& prefix,
+                           const std::string& config,
+                           const std::string& suffix,
                            std::string& dir)
 {
-  if(config)
+  if(!config.empty())
     {
     dir += prefix;
     dir += config;
@@ -974,8 +1003,8 @@ cmGlobalVisualStudio7Generator
 }
 
 std::set<std::string>
-cmGlobalVisualStudio7Generator::IsPartOfDefaultBuild(const char* project,
-                                                     cmTarget const* target)
+cmGlobalVisualStudio7Generator::IsPartOfDefaultBuild(
+  OrderedTargetDependSet const& projectTargets, cmTarget const* target)
 {
   std::set<std::string> activeConfigs;
   // if it is a utilitiy target then only make it part of the
@@ -985,7 +1014,7 @@ cmGlobalVisualStudio7Generator::IsPartOfDefaultBuild(const char* project,
     {
     return activeConfigs;
     }
-  if(type == cmTarget::UTILITY && !this->IsDependedOn(project, target))
+  if(type == cmTarget::UTILITY && !this->IsDependedOn(projectTargets, target))
     {
     return activeConfigs;
     }
@@ -1003,6 +1032,24 @@ cmGlobalVisualStudio7Generator::IsPartOfDefaultBuild(const char* project,
   return activeConfigs;
 }
 
+bool
+cmGlobalVisualStudio7Generator
+::IsDependedOn(OrderedTargetDependSet const& projectTargets,
+               cmTarget const* targetIn)
+{
+  for (OrderedTargetDependSet::const_iterator l = projectTargets.begin();
+       l != projectTargets.end(); ++l)
+    {
+    cmTarget const& target = **l;
+    TargetDependSet const& tgtdeps = this->GetTargetDirectDepends(target);
+    if(tgtdeps.count(targetIn))
+      {
+      return true;
+      }
+    }
+  return false;
+}
+
 //----------------------------------------------------------------------------
 static cmVS7FlagTable cmVS7ExtraFlagTable[] =
 {
@@ -1017,11 +1064,11 @@ static cmVS7FlagTable cmVS7ExtraFlagTable[] =
    cmVS7FlagTable::UserValueIgnored | cmVS7FlagTable::Continue},
   {"PrecompiledHeaderThrough", "Yu", "Precompiled Header Name", "",
    cmVS7FlagTable::UserValueRequired},
-  {"WholeProgramOptimization", "LTCG", "WholeProgramOptimization", "TRUE", 0},
+  {"WholeProgramOptimization", "LTCG", "WholeProgramOptimization", "true", 0},
 
   // Exception handling mode.  If no entries match, it will be FALSE.
-  {"ExceptionHandling", "GX", "enable c++ exceptions", "TRUE", 0},
-  {"ExceptionHandling", "EHsc", "enable c++ exceptions", "TRUE", 0},
+  {"ExceptionHandling", "GX", "enable c++ exceptions", "true", 0},
+  {"ExceptionHandling", "EHsc", "enable c++ exceptions", "true", 0},
   // The EHa option does not have an IDE setting.  Let it go to false,
   // and have EHa passed on the command line by leaving out the table
   // entry.
@@ -1031,4 +1078,15 @@ static cmVS7FlagTable cmVS7ExtraFlagTable[] =
 cmIDEFlagTable const* cmGlobalVisualStudio7Generator::GetExtraFlagTableVS7()
 {
   return cmVS7ExtraFlagTable;
+}
+
+std::string cmGlobalVisualStudio7Generator::Encoding()
+{
+  std::ostringstream encoding;
+#ifdef CMAKE_ENCODING_UTF8
+  encoding << "UTF-8";
+#else
+  encoding << "Windows-1252";
+#endif
+  return encoding.str();
 }

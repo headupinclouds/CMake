@@ -28,12 +28,6 @@
 #define CMAKE_NO_ANSI_FOR_SCOPE
 #endif
 
-#ifdef __BORLANDC__
-# pragma warn -8030 /* Temporary used for parameter */
-# pragma warn -8027 /* 'for' not inlined.  */
-# pragma warn -8026 /* 'exception' not inlined.  */
-# pragma warn -8004 /* value never used */
-#endif
 
 #ifdef __ICL
 #pragma warning ( disable : 985 )
@@ -78,10 +72,6 @@ public:
 #if defined(_MSC_VER)
 # pragma warning (push,1)
 #endif
-#if defined(__BORLANDC__)
-# pragma warn -8008 /* condition is always false (RESET BELOW!) */
-# pragma warn -8066 /* unreachable code (RESET BELOW!) */
-#endif
 
 #ifndef CMAKE_NO_ANSI_STREAM_HEADERS
 #  include <fstream>
@@ -112,10 +102,6 @@ public:
 #include <set>
 #include <deque>
 
-#if defined(__BORLANDC__)
-# pragma warn .8008 /* condition is always false (disabled above) */
-# pragma warn .8066 /* unreachable code (disabled above) */
-#endif
 #if defined(_MSC_VER)
 # pragma warning(pop)
 #endif
@@ -134,10 +120,6 @@ public:
 // include blockers are put in place that prevent including the
 // C-style versions from ever including the sub-headers.  Therefore we
 // have to include the sub-headers here to get the using declarations.
-#if defined(__BORLANDC__)
-# include <mem.h>    /* mem... functions from string.h */
-# include <search.h> /* search functions from stdlib.h */
-#endif
 
 
 #if !defined(_WIN32) && defined(__COMO__)
@@ -241,7 +223,7 @@ inline bool operator==(std::string const& a, const char* b)
 // std::string is really basic_string<....lots of stuff....>
 // when combined with a map or set, the symbols can be > 2000 chars!
 #include <cmsys/String.hxx>
-typedef cmsys::String cmStdString;
+//typedef cmsys::String std::string;
 
 // Define cmOStringStream and cmIStringStream wrappers to hide
 // differences between std::stringstream and the old strstream.
@@ -324,12 +306,12 @@ struct cmDocumentationEntry
 {
   std::string Name;
   std::string Brief;
-  cmDocumentationEntry(){};
+  cmDocumentationEntry(){}
   cmDocumentationEntry(const char *doc[2])
   { if (doc[0]) this->Name = doc[0];
-  if (doc[1]) this->Brief = doc[1];};
+  if (doc[1]) this->Brief = doc[1];}
   cmDocumentationEntry(const char *n, const char *b)
-  { if (n) this->Name = n; if (b) this->Brief = b; };
+  { if (n) this->Name = n; if (b) this->Brief = b; }
 };
 
 /** Data structure to represent a single command line.  */
@@ -378,7 +360,8 @@ static thisClass* SafeDownCast(cmObject *c) \
     return static_cast<thisClass *>(c); \
     } \
   return 0;\
-}
+} \
+class cmTypeMacro_UseTrailingSemicolon
 
 inline bool cmHasLiteralPrefixImpl(const std::string &str1,
                                  const char *str2,
@@ -411,8 +394,7 @@ inline bool cmHasLiteralSuffixImpl(const char* str1,
 }
 
 #if defined(_MSC_VER) && _MSC_VER < 1300 \
-  || defined(__GNUC__) && __GNUC__ < 3 \
-  || defined(__BORLANDC__)
+  || defined(__GNUC__) && __GNUC__ < 3
 
 #define cmArrayBegin(a) a
 #define cmArraySize(a) (sizeof(a)/sizeof(*a))
@@ -449,21 +431,20 @@ bool cmHasLiteralSuffix(T str1, const char (&str2)[N])
 
 struct cmStrCmp {
   cmStrCmp(const char *test) : m_test(test) {}
-  cmStrCmp(std::string &test) : m_test(test.c_str()) {}
+  cmStrCmp(const std::string &test) : m_test(test) {}
+
+  bool operator()(const std::string& input) const
+  {
+    return m_test == input;
+  }
 
   bool operator()(const char * input) const
   {
-    return strcmp(input, m_test) == 0;
-  }
-
-  // For use with binary_search
-  bool operator()(const char *str1, const char *str2) const
-  {
-    return strcmp(str1, str2) < 0;
+    return strcmp(input, m_test.c_str()) == 0;
   }
 
 private:
-  const char * const m_test;
+  const std::string m_test;
 };
 
 #endif
