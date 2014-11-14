@@ -84,6 +84,12 @@ private:
   //! Handle coverage for Jacoco
   int HandleJacocoCoverage(cmCTestCoverageHandlerContainer* cont);
 
+  //! Handle coverage for Delphi (Pascal)
+  int HandleDelphiCoverage(cmCTestCoverageHandlerContainer* cont);
+
+  //! Handle coverage for Jacoco
+  int HandleBlanketJSCoverage(cmCTestCoverageHandlerContainer* cont);
+
 //! Handle coverage using Bullseye
   int HandleBullseyeCoverage(cmCTestCoverageHandlerContainer* cont);
   int RunBullseyeSourceSummary(cmCTestCoverageHandlerContainer* cont);

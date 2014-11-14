@@ -23,6 +23,8 @@
 #include "cm_curl.h"
 #endif
 
+#include "cmFileLockResult.h"
+
 #undef GetCurrentDirectory
 #include <assert.h>
 #include <sys/types.h>
@@ -33,6 +35,7 @@
 #include <cmsys/Glob.hxx>
 #include <cmsys/RegularExpression.hxx>
 #include <cmsys/FStream.hxx>
+#include <cmsys/Encoding.hxx>
 
 // Table of permissions flags.
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -59,6 +62,35 @@ static mode_t mode_world_write = S_IWOTH;
 static mode_t mode_world_execute = S_IXOTH;
 static mode_t mode_setuid = S_ISUID;
 static mode_t mode_setgid = S_ISGID;
+#endif
+
+#if defined(WIN32) && defined(CMAKE_ENCODING_UTF8)
+// libcurl doesn't support file:// urls for unicode filenames on Windows.
+// Convert string from UTF-8 to ACP if this is a file:// URL.
+static std::string fix_file_url_windows(const std::string& url)
+{
+  std::string ret = url;
+  if(strncmp(url.c_str(), "file://", 7) == 0)
+    {
+    cmsys_stl::wstring wurl = cmsys::Encoding::ToWide(url);
+    if(!wurl.empty())
+      {
+      int mblen = WideCharToMultiByte(CP_ACP, 0, wurl.c_str(), -1,
+                                   NULL, 0, NULL, NULL);
+      if(mblen > 0)
+        {
+        std::vector<char> chars(mblen);
+        mblen = WideCharToMultiByte(CP_ACP, 0, wurl.c_str(), -1,
+                                   &chars[0], mblen, NULL, NULL);
+        if(mblen > 0)
+          {
+          ret = &chars[0];
+          }
+        }
+      }
+    }
+  return ret;
+}
 #endif
 
 // cmLibraryCommand
@@ -172,6 +204,10 @@ bool cmFileCommand
     {
     return this->HandleGenerateCommand(args);
     }
+  else if ( subCommand == "LOCK" )
+    {
+    return this->HandleLockCommand(args);
+    }
 
   std::string e = "does not recognize sub-command "+subCommand;
   this->SetError(e);
@@ -220,8 +256,6 @@ bool cmFileCommand::HandleWriteCommand(std::vector<std::string> const& args,
     cmSystemTools::SetPermissions(fileName.c_str(),
 #if defined( _MSC_VER ) || defined( __MINGW32__ )
       mode | S_IWRITE
-#elif defined( __BORLANDC__ )
-      mode | S_IWUSR
 #else
       mode | S_IWUSR | S_IWGRP
 #endif
@@ -1504,7 +1538,7 @@ bool cmFileCopier::Run(std::vector<std::string> const& args)
     {
     // Split the input file into its directory and name components.
     std::vector<std::string> fromPathComponents;
-    cmSystemTools::SplitPath(files[i].c_str(), fromPathComponents);
+    cmSystemTools::SplitPath(files[i], fromPathComponents);
     std::string fromName = *(fromPathComponents.end()-1);
     std::string fromDir = cmSystemTools::JoinPath(fromPathComponents.begin(),
                                                   fromPathComponents.end()-1);
@@ -2203,7 +2237,7 @@ bool cmFileInstaller::HandleInstallDestination()
         return false;
         }
       }
-    if ( !cmSystemTools::FileIsDirectory(destination.c_str()) )
+    if ( !cmSystemTools::FileIsDirectory(destination) )
       {
       std::string errstring = "INSTALL destination: " + destination +
         " is not a directory.";
@@ -2553,14 +2587,14 @@ bool cmFileCommand::HandleRemove(std::vector<std::string> const& args,
       fileName += "/" + *i;
       }
 
-    if(cmSystemTools::FileIsDirectory(fileName.c_str()) &&
-       !cmSystemTools::FileIsSymlink(fileName.c_str()) && recurse)
+    if(cmSystemTools::FileIsDirectory(fileName) &&
+       !cmSystemTools::FileIsSymlink(fileName) && recurse)
       {
-      cmSystemTools::RemoveADirectory(fileName.c_str());
+      cmSystemTools::RemoveADirectory(fileName);
       }
     else
       {
-      cmSystemTools::RemoveFile(fileName.c_str());
+      cmSystemTools::RemoveFile(fileName);
       }
     }
   return true;
@@ -2584,7 +2618,7 @@ bool cmFileCommand::HandleCMakePathCommand(std::vector<std::string>
 #else
   char pathSep = ':';
 #endif
-  std::vector<cmsys::String> path = cmSystemTools::SplitString(i->c_str(),
+  std::vector<cmsys::String> path = cmSystemTools::SplitString(*i,
                                                              pathSep);
   i++;
   const char* var =  i->c_str();
@@ -2990,6 +3024,10 @@ cmFileCommand::HandleDownloadCommand(std::vector<std::string> const& args)
     return false;
     }
 
+#if defined(WIN32) && defined(CMAKE_ENCODING_UTF8)
+  url = fix_file_url_windows(url);
+#endif
+
   ::CURL *curl;
   ::curl_global_init(CURL_GLOBAL_DEFAULT);
   curl = ::curl_easy_init();
@@ -3241,7 +3279,7 @@ cmFileCommand::HandleUploadCommand(std::vector<std::string> const& args)
 
   // Open file for reading:
   //
-  FILE *fin = cmsys::SystemTools::Fopen(filename.c_str(), "rb");
+  FILE *fin = cmsys::SystemTools::Fopen(filename, "rb");
   if(!fin)
     {
     std::string errStr = "UPLOAD cannot open file '";
@@ -3251,6 +3289,10 @@ cmFileCommand::HandleUploadCommand(std::vector<std::string> const& args)
     }
 
   unsigned long file_size = cmsys::SystemTools::FileLength(filename.c_str());
+
+#if defined(WIN32) && defined(CMAKE_ENCODING_UTF8)
+  url = fix_file_url_windows(url);
+#endif
 
   ::CURL *curl;
   ::curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -3462,6 +3504,192 @@ bool cmFileCommand::HandleGenerateCommand(
   std::string input = args[4];
 
   this->AddEvaluationFile(input, output, condition, inputIsContent);
+  return true;
+}
+
+//----------------------------------------------------------------------------
+bool cmFileCommand::HandleLockCommand(
+  std::vector<std::string> const& args)
+{
+  // Default values
+  bool directory = false;
+  bool release = false;
+  enum Guard {
+    GUARD_FUNCTION,
+    GUARD_FILE,
+    GUARD_PROCESS
+  };
+  Guard guard = GUARD_PROCESS;
+  std::string resultVariable;
+  unsigned timeout = static_cast<unsigned>(-1);
+
+  // Parse arguments
+  if(args.size() < 2)
+    {
+    this->SetError("sub-command LOCK requires at least two arguments.");
+    return false;
+    }
+
+  std::string path = args[1];
+  for (unsigned i = 2; i < args.size(); ++i)
+    {
+    if (args[i] == "DIRECTORY")
+      {
+      directory = true;
+      }
+    else if (args[i] == "RELEASE")
+      {
+      release = true;
+      }
+    else if (args[i] == "GUARD")
+      {
+      ++i;
+      const char* merr = ": expected FUNCTION, FILE or PROCESS after GUARD";
+      if (i >= args.size())
+        {
+        this->SetError(merr);
+        return false;
+        }
+      else
+        {
+        if (args[i] == "FUNCTION")
+          {
+          guard = GUARD_FUNCTION;
+          }
+        else if (args[i] == "FILE")
+          {
+          guard = GUARD_FILE;
+          }
+        else if (args[i] == "PROCESS")
+          {
+          guard = GUARD_PROCESS;
+          }
+        else
+          {
+          cmOStringStream e;
+          e << merr << ", but got: \"" << args[i] << "\".";
+          this->SetError(e.str());
+          return false;
+          }
+        }
+      }
+    else if (args[i] == "RESULT_VARIABLE")
+      {
+      ++i;
+      if (i >= args.size())
+        {
+        this->SetError(": expected variable name after RESULT_VARIABLE");
+        return false;
+        }
+      resultVariable = args[i];
+      }
+    else if (args[i] == "TIMEOUT")
+      {
+      ++i;
+      if (i >= args.size())
+        {
+        this->SetError(": expected timeout value after TIMEOUT");
+        return false;
+        }
+      int scanned;
+      if(sscanf(args[i].c_str(), "%d", &scanned) != 1 || scanned < 0)
+        {
+        cmOStringStream e;
+        e << "TIMEOUT value \"" << args[i] << "\" is not an unsigned integer.";
+        this->SetError(e.str());
+        return false;
+        }
+      timeout = static_cast<unsigned>(scanned);
+      }
+    else
+      {
+      cmOStringStream e;
+      e << ": expected DIRECTORY, RELEASE, GUARD, RESULT_VARIABLE or TIMEOUT";
+      e << ", but got: \"" << args[i] << "\".";
+      this->SetError(e.str());
+      return false;
+      }
+    }
+
+  if (directory)
+    {
+    path += "/cmake.lock";
+    }
+
+  if (!cmsys::SystemTools::FileIsFullPath(path))
+    {
+    path = this->Makefile->GetCurrentDirectory() + ("/" + path);
+    }
+
+  // Unify path (remove '//', '/../', ...)
+  path = cmSystemTools::CollapseFullPath(path);
+
+  // Create file and directories if needed
+  std::string parentDir = cmSystemTools::GetParentDirectory(path);
+  if (!cmSystemTools::MakeDirectory(parentDir))
+    {
+    cmOStringStream e;
+    e << ": directory \"" << parentDir << "\" creation failed ";
+    e << "(check permissions).";
+    this->SetError(e.str());
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+    }
+  FILE *file = cmsys::SystemTools::Fopen(path, "w");
+  if (!file)
+    {
+    cmOStringStream e;
+    e << ": file \"" << path << "\" creation failed (check permissions).";
+    this->SetError(e.str());
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+    }
+  fclose(file);
+
+  // Actual lock/unlock
+  cmFileLockPool& lockPool = this->Makefile->GetLocalGenerator()->
+      GetGlobalGenerator()->GetFileLockPool();
+
+  cmFileLockResult fileLockResult(cmFileLockResult::MakeOk());
+  if (release)
+    {
+    fileLockResult = lockPool.Release(path);
+    }
+  else
+    {
+    switch (guard)
+      {
+      case GUARD_FUNCTION:
+        fileLockResult = lockPool.LockFunctionScope(path, timeout);
+        break;
+      case GUARD_FILE:
+        fileLockResult = lockPool.LockFileScope(path, timeout);
+        break;
+      case GUARD_PROCESS:
+        fileLockResult = lockPool.LockProcessScope(path, timeout);
+        break;
+      default:
+        cmSystemTools::SetFatalErrorOccured();
+        return false;
+      }
+    }
+
+  const std::string result = fileLockResult.GetOutputMessage();
+
+  if (resultVariable.empty() && !fileLockResult.IsOk())
+    {
+    cmOStringStream e;
+    e << ": error locking file \"" << path << "\" (" << result << ").";
+    this->SetError(e.str());
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+    }
+
+  if (!resultVariable.empty())
+    {
+    this->Makefile->AddDefinition(resultVariable, result.c_str());
+    }
+
   return true;
 }
 

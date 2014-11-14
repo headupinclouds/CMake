@@ -115,7 +115,7 @@ endmacro()
 
 if(NOT CMake_TEST_EXTERNAL_CMAKE)
   set(CMAKE_BUILD_ON_VISUAL_STUDIO 0)
-  if(WIN32 AND NOT UNIX AND NOT BORLAND AND NOT MINGW )
+  if(WIN32 AND NOT UNIX AND NOT MINGW)
     set(CMAKE_BUILD_ON_VISUAL_STUDIO 1)
   endif()
 endif()
@@ -271,10 +271,7 @@ macro (CMAKE_BUILD_UTILITIES)
     set(CURL_SPECIAL_ZLIB_H ${CMAKE_ZLIB_HEADER})
     set(CURL_SPECIAL_LIBZ_INCLUDES ${CMAKE_ZLIB_INCLUDES})
     set(CURL_SPECIAL_LIBZ ${CMAKE_ZLIB_LIBRARIES})
-    option(CMAKE_BUILD_CURL_SHARED "Should curl be built shared" FALSE)
-    if(NOT CMAKE_BUILD_CURL_SHARED)
-      add_definitions(-DCURL_STATICLIB)
-    endif()
+    add_definitions(-DCURL_STATICLIB)
     set(CMAKE_CURL_INCLUDES)
     set(CMAKE_CURL_LIBRARIES cmcurl)
     if(CMAKE_TESTS_CDASH_SERVER)
@@ -555,7 +552,7 @@ CMAKE_SETUP_TESTING()
 
 if(NOT CMake_TEST_EXTERNAL_CMAKE)
   if(NOT CMake_VERSION_IS_RELEASE)
-    if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU" AND
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU" AND
         NOT "${CMAKE_C_COMPILER_VERSION}" VERSION_LESS 4.2)
       set(C_FLAGS_LIST -Wcast-align -Werror-implicit-function-declaration -Wchar-subscripts
                        -Wall -W -Wpointer-arith -Wwrite-strings -Wformat-security

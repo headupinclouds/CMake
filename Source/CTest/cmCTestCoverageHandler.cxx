@@ -15,6 +15,8 @@
 #include "cmParseGTMCoverage.h"
 #include "cmParseCacheCoverage.h"
 #include "cmParseJacocoCoverage.h"
+#include "cmParseDelphiCoverage.h"
+#include "cmParseBlanketJSCoverage.h"
 #include "cmCTest.h"
 #include "cmake.h"
 #include "cmMakefile.h"
@@ -164,7 +166,7 @@ void cmCTestCoverageHandler::CleanCoverageLogFiles(std::ostream& log)
       fi != files.end(); ++fi)
     {
     log << "Removing old coverage log: " << *fi << "\n";
-    cmSystemTools::RemoveFile(fi->c_str());
+    cmSystemTools::RemoveFile(*fi);
     }
 }
 
@@ -237,10 +239,10 @@ bool cmCTestCoverageHandler::ShouldIDoCoverage(const char* file,
   std::string fSrcDir = cmSystemTools::CollapseFullPath(srcDir);
   std::string fBinDir = cmSystemTools::CollapseFullPath(binDir);
   std::string fFile = cmSystemTools::CollapseFullPath(file);
-  bool sourceSubDir = cmSystemTools::IsSubDirectory(fFile.c_str(),
-    fSrcDir.c_str());
-  bool buildSubDir = cmSystemTools::IsSubDirectory(fFile.c_str(),
-    fBinDir.c_str());
+  bool sourceSubDir = cmSystemTools::IsSubDirectory(fFile,
+    fSrcDir);
+  bool buildSubDir = cmSystemTools::IsSubDirectory(fFile,
+    fBinDir);
   // Always check parent directory of the file.
   std::string fileDir = cmSystemTools::GetFilenamePath(fFile);
   std::string checkDir;
@@ -423,6 +425,19 @@ int cmCTestCoverageHandler::ProcessHandler()
     return error;
     }
 
+  file_count += this->HandleBlanketJSCoverage(&cont);
+  error = cont.Error;
+  if ( file_count < 0 )
+    {
+    return error;
+    }
+
+    file_count += this->HandleDelphiCoverage(&cont);
+  error = cont.Error;
+  if ( file_count < 0 )
+    {
+    return error;
+    }
   std::set<std::string> uncovered = this->FindUncoveredFiles(&cont);
 
   if ( file_count == 0 )
@@ -758,8 +773,8 @@ void cmCTestCoverageHandler::PopulateCustomVectors(cmMakefile *mf)
 //----------------------------------------------------------------------
 bool IsFileInDir(const std::string &infile, const std::string &indir)
 {
-  std::string file = cmSystemTools::CollapseFullPath(infile.c_str());
-  std::string dir = cmSystemTools::CollapseFullPath(indir.c_str());
+  std::string file = cmSystemTools::CollapseFullPath(infile);
+  std::string dir = cmSystemTools::CollapseFullPath(indir);
 
   if (
     file.size() > dir.size() &&
@@ -779,7 +794,7 @@ int cmCTestCoverageHandler::HandlePHPCoverage(
 {
   cmParsePHPCoverage cov(*cont, this->CTest);
   std::string coverageDir = this->CTest->GetBinaryDir() + "/xdebugCoverage";
-  if(cmSystemTools::FileIsDirectory(coverageDir.c_str()))
+  if(cmSystemTools::FileIsDirectory(coverageDir))
     {
     cov.ReadPHPCoverageDirectory(coverageDir.c_str());
     }
@@ -910,7 +925,68 @@ int cmCTestCoverageHandler::HandleJacocoCoverage(
   return static_cast<int>(cont->TotalCoverage.size());
 }
 
+//----------------------------------------------------------------------
+int cmCTestCoverageHandler::HandleDelphiCoverage(
+  cmCTestCoverageHandlerContainer* cont)
+{
+  cmParseDelphiCoverage cov =
+   cmParseDelphiCoverage(*cont, this->CTest);
+  cmsys::Glob g;
+  std::vector<std::string> files;
+  g.SetRecurse(true);
 
+
+  std::string BinDir
+    = this->CTest->GetBinaryDir();
+  std::string coverageFile = BinDir+ "/*.html";
+
+
+  g.FindFiles(coverageFile);
+  files=g.GetFiles();
+  if (files.size() > 0)
+    {
+    cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
+      "Found Delphi HTML Files, Performing Coverage" << std::endl);
+    cov.LoadCoverageData(files);
+    }
+  else
+    {
+    cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
+      " Cannot find Delphi coverage files: " << coverageFile
+      << std::endl);
+    }
+  return static_cast<int>(cont->TotalCoverage.size());
+}
+
+//----------------------------------------------------------------------
+int cmCTestCoverageHandler::HandleBlanketJSCoverage(
+  cmCTestCoverageHandlerContainer* cont)
+  {
+  cmParseBlanketJSCoverage cov =
+   cmParseBlanketJSCoverage(*cont, this->CTest);
+  std::string SourceDir
+    = this->CTest->GetCTestConfiguration("SourceDirectory");
+
+  //Look for something other than output.json, still JSON extension.
+  std::string coverageFile = SourceDir+ "/*.json";
+  cmsys::Glob g;
+  std::vector<std::string> files;
+  g.FindFiles(coverageFile);
+  files=g.GetFiles();
+  if (files.size() > 0)
+    {
+    cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
+      "Found BlanketJS output JSON, Performing Coverage" << std::endl);
+    cov.LoadCoverageData(files);
+    }
+  else
+    {
+    cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
+       " Cannot find BlanketJS coverage files: " << coverageFile
+       << std::endl);
+    }
+  return static_cast<int>(cont->TotalCoverage.size());
+  }
 //----------------------------------------------------------------------
 int cmCTestCoverageHandler::HandleGCovCoverage(
   cmCTestCoverageHandlerContainer* cont)
@@ -974,7 +1050,7 @@ int cmCTestCoverageHandler::HandleGCovCoverage(
   std::string tempDir = testingDir + "/CoverageInfo";
   std::string currentDirectory = cmSystemTools::GetCurrentWorkingDirectory();
   cmSystemTools::MakeDirectory(tempDir.c_str());
-  cmSystemTools::ChangeDirectory(tempDir.c_str());
+  cmSystemTools::ChangeDirectory(tempDir);
 
   int gcovStyle = 0;
 
@@ -1295,7 +1371,7 @@ int cmCTestCoverageHandler::HandleGCovCoverage(
           *cont->OFS << "  produced in source dir: " << sourceFile
             << std::endl;
           actualSourceFile
-            = cmSystemTools::CollapseFullPath(sourceFile.c_str());
+            = cmSystemTools::CollapseFullPath(sourceFile);
           }
         else if ( IsFileInDir(sourceFile, cont->BinaryDir) )
           {
@@ -1304,7 +1380,7 @@ int cmCTestCoverageHandler::HandleGCovCoverage(
           *cont->OFS << "  produced in binary dir: " << sourceFile
             << std::endl;
           actualSourceFile
-            = cmSystemTools::CollapseFullPath(sourceFile.c_str());
+            = cmSystemTools::CollapseFullPath(sourceFile);
           }
 
         if ( actualSourceFile.empty() )
@@ -1345,7 +1421,7 @@ int cmCTestCoverageHandler::HandleGCovCoverage(
       }
     }
 
-  cmSystemTools::ChangeDirectory(currentDirectory.c_str());
+  cmSystemTools::ChangeDirectory(currentDirectory);
   return file_count;
 }
 
@@ -1409,8 +1485,8 @@ int cmCTestCoverageHandler::HandleLCovCoverage(
   for ( it = files.begin(); it != files.end(); ++ it )
     {
     cmCTestLog(this->CTest, HANDLER_OUTPUT, "." << std::flush);
-    std::string fileDir = cmSystemTools::GetFilenamePath(it->c_str());
-    cmSystemTools::ChangeDirectory(fileDir.c_str());
+    std::string fileDir = cmSystemTools::GetFilenamePath(*it);
+    cmSystemTools::ChangeDirectory(fileDir);
     std::string command = "\"" + lcovCommand + "\" " +
       lcovExtraFlags + " ";
 
@@ -1609,7 +1685,7 @@ int cmCTestCoverageHandler::HandleLCovCoverage(
       }
     }
 
-  cmSystemTools::ChangeDirectory(currentDirectory.c_str());
+  cmSystemTools::ChangeDirectory(currentDirectory);
   return file_count;
 }
 
@@ -1653,7 +1729,7 @@ void cmCTestCoverageHandler::FindLCovFiles(std::vector<std::string>& files)
   gl.RecurseThroughSymlinksOff();
   std::string prevBinaryDir;
   cmSystemTools::ChangeDirectory(
-    this->CTest->GetCTestConfiguration("BuildDirectory").c_str());
+    this->CTest->GetCTestConfiguration("BuildDirectory"));
 
   // Run profmerge to merge all *.dyn files into dpi files
   cmSystemTools::RunSingleCommand("profmerge");
@@ -1696,9 +1772,9 @@ int cmCTestCoverageHandler::HandleTracePyCoverage(
   std::string tempDir = testingDir + "/CoverageInfo";
   std::string currentDirectory = cmSystemTools::GetCurrentWorkingDirectory();
   cmSystemTools::MakeDirectory(tempDir.c_str());
-  cmSystemTools::ChangeDirectory(tempDir.c_str());
+  cmSystemTools::ChangeDirectory(tempDir);
 
-  cmSystemTools::ChangeDirectory(currentDirectory.c_str());
+  cmSystemTools::ChangeDirectory(currentDirectory);
 
   std::vector<std::string>::iterator fileIt;
   int file_count = 0;
@@ -1714,7 +1790,7 @@ int cmCTestCoverageHandler::HandleTracePyCoverage(
       }
 
     std::string actualSourceFile
-      = cmSystemTools::CollapseFullPath(fileName.c_str());
+      = cmSystemTools::CollapseFullPath(fileName);
     cmCTestLog(this->CTest, HANDLER_VERBOSE_OUTPUT,
       "   Check coverage for file: " << actualSourceFile
       << std::endl);
@@ -1802,7 +1878,7 @@ int cmCTestCoverageHandler::HandleTracePyCoverage(
       }
     ++ file_count;
     }
-  cmSystemTools::ChangeDirectory(currentDirectory.c_str());
+  cmSystemTools::ChangeDirectory(currentDirectory);
   return file_count;
 }
 
@@ -2132,7 +2208,7 @@ int cmCTestCoverageHandler::RunBullseyeSourceSummary(
         file += "/";
         file += sourceFile;
         }
-      file = cmSystemTools::CollapseFullPath(file.c_str());
+      file = cmSystemTools::CollapseFullPath(file);
       bool shouldIDoCoverage
         = this->ShouldIDoCoverage(file.c_str(),
                                   cont->SourceDir.c_str(),

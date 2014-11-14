@@ -219,6 +219,12 @@ set(SRCS
   cmExtraKateGenerator.h
   cmExtraSublimeTextGenerator.cxx
   cmExtraSublimeTextGenerator.h
+  cmFileLock.cxx
+  cmFileLock.h
+  cmFileLockPool.cxx
+  cmFileLockPool.h
+  cmFileLockResult.cxx
+  cmFileLockResult.h
   cmFileTimeComparison.cxx
   cmFileTimeComparison.h
   cmGeneratedFileStream.cxx
@@ -473,7 +479,7 @@ set(SRCS ${SRCS}
   cmNinjaUtilityTargetGenerator.cxx
   cmNinjaUtilityTargetGenerator.h
   )
-if(WIN32 AND NOT CYGWIN AND NOT BORLAND)
+if(WIN32 AND NOT CYGWIN)
   set_source_files_properties(cmcldeps.cxx PROPERTIES COMPILE_DEFINITIONS _WIN32_WINNT=0x0501)
   add_executable(cmcldeps cmcldeps.cxx)
   target_link_libraries(cmcldeps CMakeLib)
@@ -522,8 +528,10 @@ set(CTEST_SRCS cmCTest.cxx
   CTest/cmParseCacheCoverage.cxx
   CTest/cmParseGTMCoverage.cxx
   CTest/cmParseJacocoCoverage.cxx
+  CTest/cmParseBlanketJSCoverage.cxx
   CTest/cmParsePHPCoverage.cxx
   CTest/cmParseCoberturaCoverage.cxx
+  CTest/cmParseDelphiCoverage.cxx
   CTest/cmCTestEmptyBinaryDirectoryCommand.cxx
   CTest/cmCTestGenericHandler.cxx
   CTest/cmCTestHandlerCommand.cxx

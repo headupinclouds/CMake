@@ -52,8 +52,7 @@
 #include <sys/stat.h>
 
 #if defined(_WIN32) && \
-   (defined(_MSC_VER) || defined(__WATCOMC__) || \
-    defined(__BORLANDC__) || defined(__MINGW32__))
+   (defined(_MSC_VER) || defined(__WATCOMC__) || defined(__MINGW32__))
 # include <io.h>
 #endif
 
@@ -97,7 +96,7 @@ cm_archive_entry_pathname(struct archive_entry *entry)
 {
 #if cmsys_STL_HAS_WSTRING
   return cmsys::Encoding::ToNarrow(
-    archive_entry_pathname_w(entry)).c_str();
+    archive_entry_pathname_w(entry));
 #else
   return archive_entry_pathname(entry);
 #endif
@@ -881,7 +880,7 @@ std::string cmSystemTools::FileExistsInParentDirectories(const char* fname,
       break;
       }
     prevDir = dir;
-    dir = cmSystemTools::GetParentDirectory(dir.c_str());
+    dir = cmSystemTools::GetParentDirectory(dir);
     }
   return "";
 }
@@ -1014,7 +1013,7 @@ void cmSystemTools::Glob(const std::string& directory,
   cmsys::Directory d;
   cmsys::RegularExpression reg(regexp.c_str());
 
-  if (d.Load(directory.c_str()))
+  if (d.Load(directory))
     {
     size_t numf;
         unsigned int i;
@@ -1044,7 +1043,7 @@ void cmSystemTools::GlobDirs(const std::string& path,
   std::string finishPath = path.substr(pos+2);
 
   cmsys::Directory d;
-  if (d.Load(startPath.c_str()))
+  if (d.Load(startPath))
     {
     for (unsigned int i = 0; i < d.GetNumberOfFiles(); ++i)
       {
@@ -1054,7 +1053,7 @@ void cmSystemTools::GlobDirs(const std::string& path,
         std::string fname = startPath;
         fname +="/";
         fname += d.GetFile(i);
-        if(cmSystemTools::FileIsDirectory(fname.c_str()))
+        if(cmSystemTools::FileIsDirectory(fname))
           {
           fname += finishPath;
           cmSystemTools::GlobDirs(fname, files);
@@ -1168,7 +1167,7 @@ bool cmSystemTools::SimpleGlob(const std::string& glob,
 
   bool res = false;
   cmsys::Directory d;
-  if (d.Load(path.c_str()))
+  if (d.Load(path))
     {
     for (unsigned int i = 0; i < d.GetNumberOfFiles(); ++i)
       {
@@ -1182,11 +1181,11 @@ bool cmSystemTools::SimpleGlob(const std::string& glob,
           }
         fname += d.GetFile(i);
         std::string sfname = d.GetFile(i);
-        if ( type > 0 && cmSystemTools::FileIsDirectory(fname.c_str()) )
+        if ( type > 0 && cmSystemTools::FileIsDirectory(fname) )
           {
           continue;
           }
-        if ( type < 0 && !cmSystemTools::FileIsDirectory(fname.c_str()) )
+        if ( type < 0 && !cmSystemTools::FileIsDirectory(fname) )
           {
           continue;
           }
@@ -1354,8 +1353,8 @@ std::string cmSystemTools::CollapseCombinedPath(std::string const& dir,
 
   std::vector<std::string> dirComponents;
   std::vector<std::string> fileComponents;
-  cmSystemTools::SplitPath(dir.c_str(), dirComponents);
-  cmSystemTools::SplitPath(file.c_str(), fileComponents);
+  cmSystemTools::SplitPath(dir, dirComponents);
+  cmSystemTools::SplitPath(file, fileComponents);
 
   if(fileComponents.empty())
     {
@@ -1649,9 +1648,6 @@ namespace{
     fprintf(out, " -> %s", archive_entry_symlink(entry));
     }
 }
-#ifdef __BORLANDC__
-# pragma warn -8066 /* unreachable code */
-#endif
 
 long copy_data(struct archive *ar, struct archive *aw)
 {
@@ -2176,7 +2172,7 @@ void cmSystemTools::FindCMakeResources(const char* argv0)
   if(cmSystemTools::FindProgramPath(argv0, exe, errorMsg))
     {
     // remove symlinks
-    exe = cmSystemTools::GetRealPath(exe.c_str());
+    exe = cmSystemTools::GetRealPath(exe);
     exe_dir =
       cmSystemTools::GetFilenamePath(exe);
     }
@@ -2227,7 +2223,7 @@ void cmSystemTools::FindCMakeResources(const char* argv0)
     cmsys::ifstream fin(src_dir_txt.c_str());
     std::string src_dir;
     if(fin && cmSystemTools::GetLineFromStream(fin, src_dir) &&
-       cmSystemTools::FileIsDirectory(src_dir.c_str()))
+       cmSystemTools::FileIsDirectory(src_dir))
       {
       cmSystemToolsCMakeRoot = src_dir;
       }
@@ -2237,7 +2233,7 @@ void cmSystemTools::FindCMakeResources(const char* argv0)
       src_dir_txt = dir + "/CMakeFiles/CMakeSourceDir.txt";
       cmsys::ifstream fin2(src_dir_txt.c_str());
       if(fin2 && cmSystemTools::GetLineFromStream(fin2, src_dir) &&
-         cmSystemTools::FileIsDirectory(src_dir.c_str()))
+         cmSystemTools::FileIsDirectory(src_dir))
         {
         cmSystemToolsCMakeRoot = src_dir;
         }
@@ -2333,7 +2329,7 @@ bool cmSystemTools::GuessLibrarySOName(std::string const& fullPath,
 #endif
 
   // If the file is not a symlink we have no guess for its soname.
-  if(!cmSystemTools::FileIsSymlink(fullPath.c_str()))
+  if(!cmSystemTools::FileIsSymlink(fullPath))
     {
     return false;
     }
@@ -2638,28 +2634,36 @@ bool cmSystemTools::ChangeRPath(std::string const& file,
 bool cmSystemTools::VersionCompare(cmSystemTools::CompareOp op,
                                    const char* lhss, const char* rhss)
 {
-  // Parse out up to 8 components.
-  unsigned int lhs[8] = {0,0,0,0,0,0,0,0};
-  unsigned int rhs[8] = {0,0,0,0,0,0,0,0};
-  sscanf(lhss, "%u.%u.%u.%u.%u.%u.%u.%u",
-         &lhs[0], &lhs[1], &lhs[2], &lhs[3],
-         &lhs[4], &lhs[5], &lhs[6], &lhs[7]);
-  sscanf(rhss, "%u.%u.%u.%u.%u.%u.%u.%u",
-         &rhs[0], &rhs[1], &rhs[2], &rhs[3],
-         &rhs[4], &rhs[5], &rhs[6], &rhs[7]);
+  const char *endl = lhss;
+  const char *endr = rhss;
+  unsigned long lhs, rhs;
 
-  // Do component-wise comparison.
-  for(unsigned int i=0; i < 8; ++i)
+  while (((*endl >= '0') && (*endl <= '9')) ||
+         ((*endr >= '0') && (*endr <= '9')))
     {
-    if(lhs[i] < rhs[i])
+    // Do component-wise comparison.
+    lhs = strtoul(endl, const_cast<char**>(&endl), 10);
+    rhs = strtoul(endr, const_cast<char**>(&endr), 10);
+
+    if(lhs < rhs)
       {
       // lhs < rhs, so true if operation is LESS
       return op == cmSystemTools::OP_LESS;
       }
-    else if(lhs[i] > rhs[i])
+    else if(lhs > rhs)
       {
       // lhs > rhs, so true if operation is GREATER
       return op == cmSystemTools::OP_GREATER;
+      }
+
+    if (*endr == '.')
+      {
+      endr++;
+      }
+
+    if (*endl == '.')
+      {
+      endl++;
       }
     }
   // lhs == rhs, so true if operation is EQUAL

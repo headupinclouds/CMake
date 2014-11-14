@@ -315,36 +315,43 @@ void cmLocalUnixMakefileGenerator3::WriteLocalMakefile()
 
     // Check whether preprocessing and assembly rules make sense.
     // They make sense only for C and C++ sources.
-    bool lang_is_c_or_cxx = false;
+    bool lang_has_preprocessor = false;
+    bool lang_has_assembly = false;
+
     for(std::vector<LocalObjectEntry>::const_iterator ei =
           lo->second.begin(); ei != lo->second.end(); ++ei)
       {
-      if(ei->Language == "C" || ei->Language == "CXX")
+      if(ei->Language == "C" ||
+         ei->Language == "CXX" ||
+         ei->Language == "Fortran")
         {
-        lang_is_c_or_cxx = true;
+        // Right now, C, C++ and Fortran have both a preprocessor and the
+        // ability to generate assembly code
+        lang_has_preprocessor = true;
+        lang_has_assembly = true;
         break;
         }
       }
 
     // Add convenience rules for preprocessed and assembly files.
-    if(lang_is_c_or_cxx && (do_preprocess_rules || do_assembly_rules))
+    if(lang_has_preprocessor && do_preprocess_rules)
       {
       std::string::size_type dot_pos = lo->first.rfind(".");
       std::string base = lo->first.substr(0, dot_pos);
-      if(do_preprocess_rules)
-        {
-        this->WriteObjectConvenienceRule(
-          ruleFileStream, "target to preprocess a source file",
-          (base + ".i").c_str(), lo->second);
-          lo->second.HasPreprocessRule = true;
-        }
-      if(do_assembly_rules)
-        {
-        this->WriteObjectConvenienceRule(
-          ruleFileStream, "target to generate assembly for a file",
-          (base + ".s").c_str(), lo->second);
-          lo->second.HasAssembleRule = true;
-        }
+      this->WriteObjectConvenienceRule(
+        ruleFileStream, "target to preprocess a source file",
+       (base + ".i").c_str(), lo->second);
+      lo->second.HasPreprocessRule = true;
+      }
+
+    if(lang_has_assembly && do_assembly_rules)
+      {
+      std::string::size_type dot_pos = lo->first.rfind(".");
+      std::string base = lo->first.substr(0, dot_pos);
+      this->WriteObjectConvenienceRule(
+       ruleFileStream, "target to generate assembly for a file",
+       (base + ".s").c_str(), lo->second);
+      lo->second.HasAssembleRule = true;
       }
     }
 
@@ -700,7 +707,7 @@ cmLocalUnixMakefileGenerator3
     // name.  This is needed to avoid funny quoting problems on
     // lines with shell redirection operators.
     std::string scmd;
-    if(cmSystemTools::GetShortPath(cmd.c_str(), scmd))
+    if(cmSystemTools::GetShortPath(cmd, scmd))
       {
       return this->Convert(scmd, NONE, SHELL);
       }
@@ -1733,7 +1740,7 @@ void cmLocalUnixMakefileGenerator3::CheckMultipleOutputs(bool verbose)
             << depender << "\" does not exist." << std::endl;
         cmSystemTools::Stdout(msg.str().c_str());
         }
-      cmSystemTools::RemoveFile(dependee.c_str());
+      cmSystemTools::RemoveFile(dependee);
       }
     }
 }
@@ -1988,7 +1995,7 @@ void cmLocalUnixMakefileGenerator3::ClearDependencies(cmMakefile* mf,
     // Remove the internal dependency check file to force
     // regeneration.
     std::string internalDependFile = dir + "/depend.internal";
-    cmSystemTools::RemoveFile(internalDependFile.c_str());
+    cmSystemTools::RemoveFile(internalDependFile);
     }
 }
 
