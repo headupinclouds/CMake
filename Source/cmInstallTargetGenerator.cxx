@@ -56,6 +56,7 @@ void cmInstallTargetGenerator::GenerateScript(std::ostream& os)
     }
 
   // Perform the main install script generation.
+  os << "set(INSTALL_UNIVERSAL_IOS_STATIC_LIBRARY_NAME \"" << this->Target->GetName() << "\")" << std::endl;
   this->cmInstallGenerator::GenerateScript(os);
 }
 
@@ -75,6 +76,11 @@ void cmInstallTargetGenerator::GenerateScriptForConfig(std::ostream& os,
   else
     {
     fromDirConfig = this->Target->GetDirectory(config, this->ImportLibrary);
+    const std::string replace_str = "$(EFFECTIVE_PLATFORM_NAME)";
+    std::string::size_type pos = fromDirConfig.find(replace_str);
+    if (pos != std::string::npos) {
+      fromDirConfig.replace(pos, replace_str.size(), "$ENV{EFFECTIVE_PLATFORM_NAME}");
+    }
     fromDirConfig += "/";
     }
   std::string toDir = this->GetInstallDestination();

@@ -452,10 +452,27 @@ void cmLocalGenerator::GenerateInstallRules()
     "  else()\n"
     "    set(CMAKE_INSTALL_CONFIG_NAME \"" << default_config << "\")\n"
     "  endif()\n"
-    "  message(STATUS \"Install configuration: "
-    "\\\"${CMAKE_INSTALL_CONFIG_NAME}\\\"\")\n"
     "endif()\n"
     "\n";
+
+  fout <<
+    "if(NOT ENV{EFFECTIVE_PLATFORM_NAME} STREQUAL \"\")\n"
+    "  string(\n"
+    "      REPLACE\n"
+    "      \"$ENV{EFFECTIVE_PLATFORM_NAME}\"\n"
+    "      \"\"\n"
+    "      CMAKE_INSTALL_CONFIG_NAME\n"
+    "      \"${CMAKE_INSTALL_CONFIG_NAME}\"\n"
+    "  )\n"
+    "  if(NOT INSTALL_UNIVERSAL_IOS_STATIC_LIBRARY_TOP)\n"
+    "    include(install_universal_ios_static_library)\n"
+    "    set(INSTALL_UNIVERSAL_IOS_STATIC_LIBRARY_TOP \"${CMAKE_CURRENT_LIST_DIR}\")\n"
+    "  endif()\n"
+    "endif()\n\n";
+
+  fout <<
+    "message(STATUS \"Install configuration: "
+    "\\\"${CMAKE_INSTALL_CONFIG_NAME}\\\"\")\n\n";
 
   // Write support code for dealing with component-specific installs.
   fout <<
