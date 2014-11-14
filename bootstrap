@@ -286,6 +286,9 @@ CMAKE_CXX_SOURCES="\
   cmSystemTools \
   cmTestGenerator \
   cmVersion \
+  cmFileLock \
+  cmFileLockPool \
+  cmFileLockResult \
   cmFileTimeComparison \
   cmGlobalUnixMakefileGenerator3 \
   cmLocalUnixMakefileGenerator3 \
