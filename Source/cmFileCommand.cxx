@@ -3521,7 +3521,7 @@ bool cmFileCommand::HandleLockCommand(
   };
   Guard guard = GUARD_PROCESS;
   std::string resultVariable;
-  unsigned timeout = static_cast<unsigned>(-1);
+  unsigned long long timeout = static_cast<unsigned long long>(-1);
 
   // Parse arguments
   if(args.size() < 2)
@@ -3597,7 +3597,7 @@ bool cmFileCommand::HandleLockCommand(
             "expected timeout value after TIMEOUT");
         return false;
         }
-      int scanned;
+      long long scanned;
       if(!cmSystemTools::StringToInt(args[i].c_str(), &scanned) || scanned < 0)
         {
         cmOStringStream e;
@@ -3605,7 +3605,7 @@ bool cmFileCommand::HandleLockCommand(
         this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
         return false;
         }
-      timeout = static_cast<unsigned>(scanned);
+      timeout = static_cast<unsigned long long>(scanned);
       }
     else
       {
