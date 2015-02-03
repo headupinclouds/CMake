@@ -18,7 +18,7 @@ New Features
 Generators
 ----------
 
-* A :generator:`Visual Studio 14` generator was added.
+* The :generator:`Visual Studio 14 2015` generator was added.
 
 Windows Phone and Windows Store
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -69,8 +69,14 @@ Commands
   :variable:`CMAKE_FIND_PACKAGE_NO_SYSTEM_PACKAGE_REGISTRY`
   variables to skip searching the package registries.
 
+* The :command:`get_property` command learned a new ``INSTALL`` scope
+  for properties.
+
 * The :command:`install` command learned a ``MESSAGE_NEVER`` option
   to avoid output during installation.
+
+* The :command:`set_property` command learned a new ``INSTALL`` scope
+  for properties.
 
 * The :command:`string` command learned a new ``GENEX_STRIP`` subcommand
   which removes
@@ -159,6 +165,10 @@ Properties
   to tell the Visual Studio generators to mark content for deployment
   in Windows Phone and Windows Store projects.
 
+* A :prop_sf:`VS_DEPLOYMENT_LOCATION` source file property was added
+  to tell the Visual Studio generators the relative location of content
+  marked for deployment in Windows Phone and Windows Store projects.
+
 * The :prop_tgt:`VS_WINRT_COMPONENT` target property was created to
   tell Visual Studio generators to compile a shared library as a
   Windows Runtime (WinRT) component.
@@ -230,13 +240,12 @@ Modules
 
 * The :module:`FindOpenCL` module was introduced.
 
-* The :module:`FindOpenGL` module now provides imported targets
-  ``OpenGL::GL`` and ``OpenGL::GLU`` when the libraries are found.
-
 * The :module:`FindOpenMP` module learned to support Fortran.
 
 * The :module:`FindPkgConfig` module learned to use the ``PKG_CONFIG``
   environment variable value as the ``pkg-config`` executable, if set.
+
+* The :module:`FindXercesC` module was introduced.
 
 * The :module:`FindZLIB` module now provides imported targets.
 
@@ -310,8 +319,10 @@ Other
 
 * The Visual Studio generators learned to treat ``.hlsl`` source
   files as High Level Shading Language sources (using ``FXCompile``
-  in ``.vcxproj`` files).  A :prop_sf:`VS_SHADER_TYPE` source file
-  property was added to specify the Shader Type.
+  in ``.vcxproj`` files).  Source file properties
+  :prop_sf:`VS_SHADER_TYPE`, :prop_sf:`VS_SHADER_MODEL`, and
+  :prop_sf:`VS_SHADER_ENTRYPOINT` were added added to specify the
+  shader type, model, and entry point name.
 
 New Diagnostics
 ===============
@@ -341,6 +352,28 @@ Deprecated and Removed Features
     target_link_libraries(A PUBLIC "$<BUILD_INTERFACE:${libs}>")
 
   CMake 3.1 again requires the quotes for this to work correctly.
+
+* Prior to CMake 3.1 the Makefile generators did not escape ``#``
+  correctly inside make variable assignments used in generated
+  makefiles, causing them to be treated as comments.  This made
+  code like::
+
+    add_compile_options(-Wno-#pragma-messages)
+
+  not work in Makefile generators, but work in other generators.
+  Now it is escaped correctly, making the behavior consistent
+  across generators.  However, some projects may have tried to
+  workaround the original bug with code like::
+
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-\\#pragma-messages")
+
+  This added the needed escape for Makefile generators but also
+  caused other generators to pass ``-Wno-\#pragma-messages`` to
+  the shell, which would work only in POSIX shells.
+  Unfortunately the escaping fix could not be made in a compatible
+  way so this platform- and generator-specific workaround no
+  longer works.  Project code may test the :variable:`CMAKE_VERSION`
+  variable value to make the workaround version-specific too.
 
 * Callbacks established by the :command:`variable_watch` command will no
   longer receive the ``ALLOWED_UNKNOWN_READ_ACCESS`` access type when

@@ -102,7 +102,6 @@ cmMakefile::cmMakefile(): Internal(new Internals)
   this->PreOrder = false;
   this->GeneratingBuildSystem = false;
 
-  this->NumLastMatches = 0;
   this->SuppressWatches = false;
 }
 
@@ -153,7 +152,6 @@ cmMakefile::cmMakefile(const cmMakefile& mf): Internal(new Internals)
   this->ListFileStack = mf.ListFileStack;
   this->OutputToSource = mf.OutputToSource;
 
-  this->NumLastMatches = mf.NumLastMatches;
   this->SuppressWatches = mf.SuppressWatches;
 }
 
@@ -4747,51 +4745,6 @@ std::vector<cmSourceFile*> cmMakefile::GetQtUiFilesWithOptions() const
   return this->QtUiFilesWithOptions;
 }
 
-static std::string matchVariables[] = {
-  "CMAKE_MATCH_0",
-  "CMAKE_MATCH_1",
-  "CMAKE_MATCH_2",
-  "CMAKE_MATCH_3",
-  "CMAKE_MATCH_4",
-  "CMAKE_MATCH_5",
-  "CMAKE_MATCH_6",
-  "CMAKE_MATCH_7",
-  "CMAKE_MATCH_8",
-  "CMAKE_MATCH_9"
-};
-
-//----------------------------------------------------------------------------
-void cmMakefile::ClearMatches()
-{
-  for (unsigned int i=0; i<this->NumLastMatches; i++)
-    {
-    std::string const& var = matchVariables[i];
-    std::string const& s = this->GetSafeDefinition(var);
-    if(!s.empty())
-      {
-      this->AddDefinition(var, "");
-      this->MarkVariableAsUsed(var);
-      }
-    }
-  this->NumLastMatches = 0;
-}
-
-//----------------------------------------------------------------------------
-void cmMakefile::StoreMatches(cmsys::RegularExpression& re)
-{
-  for (unsigned int i=0; i<10; i++)
-    {
-    std::string const& m = re.match(i);
-    if(!m.empty())
-      {
-      std::string const& var = matchVariables[i];
-      this->AddDefinition(var, m.c_str());
-      this->MarkVariableAsUsed(var);
-      this->NumLastMatches = i + 1;
-      }
-    }
-}
-
 //----------------------------------------------------------------------------
 cmPolicies::PolicyStatus
 cmMakefile::GetPolicyStatus(cmPolicies::PolicyID id) const
@@ -5181,18 +5134,19 @@ CompileFeaturesAvailable(const std::string& lang, std::string *error) const
 }
 
 //----------------------------------------------------------------------------
-bool cmMakefile::HaveFeatureAvailable(cmTarget const* target,
+bool cmMakefile::HaveStandardAvailable(cmTarget const* target,
                                       std::string const& lang,
                                       const std::string& feature) const
 {
   return lang == "C"
-      ? this->HaveCFeatureAvailable(target, feature)
-      : this->HaveCxxFeatureAvailable(target, feature);
+      ? this->HaveCStandardAvailable(target, feature)
+      : this->HaveCxxStandardAvailable(target, feature);
 }
 
 //----------------------------------------------------------------------------
 bool cmMakefile::
-HaveCFeatureAvailable(cmTarget const* target, const std::string& feature) const
+HaveCStandardAvailable(cmTarget const* target,
+                       const std::string& feature) const
 {
   bool needC90 = false;
   bool needC99 = false;
@@ -5269,7 +5223,7 @@ bool cmMakefile::IsLaterStandard(std::string const& lang,
 }
 
 //----------------------------------------------------------------------------
-bool cmMakefile::HaveCxxFeatureAvailable(cmTarget const* target,
+bool cmMakefile::HaveCxxStandardAvailable(cmTarget const* target,
                                          const std::string& feature) const
 {
   bool needCxx98 = false;
