@@ -451,7 +451,7 @@ void cmMakefileTargetGenerator
     }
   else
     {
-    cmOStringStream err;
+    std::ostringstream err;
     err << "Warning: Source file \""
         << source.GetFullPath()
         << "\" is listed multiple times for target \""
@@ -754,29 +754,20 @@ cmMakefileTargetGenerator
                   compileCommands.begin(), compileCommands.end());
   }
 
-  // Write the rule.
-  this->LocalGenerator->WriteMakeRule(*this->BuildFileStream, 0,
-                                      relativeObj,
-                                      depends, commands, false);
-
   // Check for extra outputs created by the compilation.
+  std::vector<std::string> outputs(1, relativeObj);
   if(const char* extra_outputs_str =
      source.GetProperty("OBJECT_OUTPUTS"))
     {
-    std::vector<std::string> extra_outputs;
-    cmSystemTools::ExpandListArgument(extra_outputs_str, extra_outputs);
-    for(std::vector<std::string>::const_iterator eoi = extra_outputs.begin();
-        eoi != extra_outputs.end(); ++eoi)
-      {
-      // Register this as an extra output for the object file rule.
-      // This will cause the object file to be rebuilt if the extra
-      // output is missing.
-      this->GenerateExtraOutput(eoi->c_str(), relativeObj.c_str(), false);
-
-      // Register this as an extra file to clean.
-      this->CleanFiles.push_back(*eoi);
-      }
+    // Register these as extra files to clean.
+    cmSystemTools::ExpandListArgument(extra_outputs_str, outputs);
+    this->CleanFiles.insert(this->CleanFiles.end(),
+                            outputs.begin() + 1, outputs.end());
     }
+
+  // Write the rule.
+  this->WriteMakeRule(*this->BuildFileStream, 0, outputs,
+                      depends, commands, false);
 
   bool do_preprocess_rules = lang_has_preprocessor &&
     this->LocalGenerator->GetCreatePreprocessedSourceRules();
@@ -997,6 +988,57 @@ void cmMakefileTargetGenerator::WriteTargetCleanRules()
                                       depends, commands, true);
 }
 
+//----------------------------------------------------------------------------
+void cmMakefileTargetGenerator::WriteMakeRule(
+  std::ostream& os,
+  const char* comment,
+  const std::vector<std::string>& outputs,
+  const std::vector<std::string>& depends,
+  const std::vector<std::string>& commands,
+  bool symbolic,
+  bool in_help)
+{
+  if (outputs.size() == 0)
+    {
+    return;
+    }
+
+  // We always attach the actual commands to the first output.
+  this->LocalGenerator->WriteMakeRule(os, comment, outputs[0], depends,
+                                      commands, symbolic, in_help);
+
+  // For single outputs, we are done.
+  if (outputs.size() == 1)
+    {
+    return;
+    }
+
+  // For multiple outputs, make the extra ones depend on the first one.
+  std::vector<std::string> const output_depends(1, outputs[0]);
+  for (std::vector<std::string>::const_iterator o = outputs.begin()+1;
+       o != outputs.end(); ++o)
+    {
+    // Touch the extra output so "make" knows that it was updated,
+    // but only if the output was acually created.
+    std::string const out = this->Convert(*o, cmLocalGenerator::HOME_OUTPUT,
+                                          cmLocalGenerator::SHELL);
+    std::vector<std::string> output_commands;
+    if (!symbolic)
+      {
+      output_commands.push_back("@$(CMAKE_COMMAND) -E touch_nocreate " + out);
+      }
+    this->LocalGenerator->WriteMakeRule(os, 0, *o, output_depends,
+                                        output_commands, symbolic, in_help);
+
+    if (!symbolic)
+      {
+      // At build time, remove the first output if this one does not exist
+      // so that "make" will rerun the real commands that create this one.
+      MultipleOutputPairsType::value_type p(*o, outputs[0]);
+      this->MultipleOutputPairs.insert(p);
+      }
+    }
+}
 
 //----------------------------------------------------------------------------
 void cmMakefileTargetGenerator::WriteTargetDependRules()
@@ -1126,7 +1168,7 @@ void cmMakefileTargetGenerator::WriteTargetDependRules()
 
   // Add a command to call CMake to scan dependencies.  CMake will
   // touch the corresponding depends file after scanning dependencies.
-  cmOStringStream depCmd;
+  std::ostringstream depCmd;
   // TODO: Account for source file properties and directory-level
   // definitions when scanning for dependencies.
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -1199,11 +1241,7 @@ cmMakefileTargetGenerator
       {
       cmCustomCommandGenerator ccg(*cc, this->ConfigName, this->Makefile);
       const std::vector<std::string>& outputs = ccg.GetOutputs();
-      for(std::vector<std::string>::const_iterator o = outputs.begin();
-          o != outputs.end(); ++o)
-        {
-        depends.push_back(*o);
-        }
+      depends.insert(depends.end(), outputs.begin(), outputs.end());
       }
     }
 }
@@ -1218,13 +1256,7 @@ void cmMakefileTargetGenerator
   depends.push_back(source.GetFullPath());
   if(const char* objectDeps = source.GetProperty("OBJECT_DEPENDS"))
     {
-    std::vector<std::string> deps;
-    cmSystemTools::ExpandListArgument(objectDeps, deps);
-    for(std::vector<std::string>::iterator i = deps.begin();
-        i != deps.end(); ++i)
-      {
-      depends.push_back(*i);
-      }
+    cmSystemTools::ExpandListArgument(objectDeps, depends);
     }
 }
 
@@ -1248,7 +1280,7 @@ void cmMakefileTargetGenerator
     }
 
   // Now append the actual user-specified commands.
-  cmOStringStream content;
+  std::ostringstream content;
   this->LocalGenerator->AppendCustomCommand(commands, ccg, this->Target, false,
                                             cmLocalGenerator::HOME_OUTPUT,
                                             &content);
@@ -1272,9 +1304,8 @@ void cmMakefileTargetGenerator
       symbolic = sf->GetPropertyAsBool("SYMBOLIC");
       }
     }
-  this->LocalGenerator->WriteMakeRule(*this->BuildFileStream, 0,
-                                      *o, depends, commands,
-                                      symbolic);
+  this->WriteMakeRule(*this->BuildFileStream, 0, outputs,
+                      depends, commands, symbolic);
 
   // If the rule has changed make sure the output is rebuilt.
   if(!symbolic)
@@ -1282,21 +1313,6 @@ void cmMakefileTargetGenerator
     this->GlobalGenerator->AddRuleHash(ccg.GetOutputs(), content.str());
     }
   }
-
-  // Write rules to drive building any outputs beyond the first.
-  const char* in = o->c_str();
-  for(++o; o != outputs.end(); ++o)
-    {
-    bool symbolic = false;
-    if(need_symbolic)
-      {
-      if(cmSourceFile* sf = this->Makefile->GetSource(*o))
-        {
-        symbolic = sf->GetPropertyAsBool("SYMBOLIC");
-        }
-      }
-    this->GenerateExtraOutput(o->c_str(), in, symbolic);
-    }
 
   // Setup implicit dependency scanning.
   for(cmCustomCommand::ImplicitDependsList::const_iterator
@@ -1316,32 +1332,6 @@ void cmMakefileTargetGenerator
 
 //----------------------------------------------------------------------------
 void
-cmMakefileTargetGenerator
-::GenerateExtraOutput(const char* out, const char* in, bool symbolic)
-{
-  // Add a rule to build the primary output if the extra output needs
-  // to be created.
-  std::vector<std::string> commands;
-  std::vector<std::string> depends;
-  std::string emptyCommand = this->GlobalGenerator->GetEmptyRuleHackCommand();
-  if(!emptyCommand.empty())
-    {
-    commands.push_back(emptyCommand);
-    }
-  depends.push_back(in);
-  this->LocalGenerator->WriteMakeRule(*this->BuildFileStream, 0,
-                                      out, depends, commands,
-                                      symbolic);
-
-  // Register the extra output as paired with the first output so that
-  // the check-build-system step will remove the primary output if any
-  // extra outputs are missing.  This forces the rule to regenerate
-  // all outputs.
-  this->AddMultipleOutputPair(out, in);
-}
-
-//----------------------------------------------------------------------------
-void
 cmMakefileTargetGenerator::AppendProgress(std::vector<std::string>& commands)
 {
   this->NumberOfProgressActions++;
@@ -1351,7 +1341,7 @@ cmMakefileTargetGenerator::AppendProgress(std::vector<std::string>& commands)
     }
   std::string progressDir = this->Makefile->GetHomeOutputDirectory();
   progressDir += cmake::GetCMakeFilesDirectory();
-  cmOStringStream progCmd;
+  std::ostringstream progCmd;
   progCmd << "$(CMAKE_COMMAND) -E cmake_progress_report ";
   progCmd << this->LocalGenerator->Convert(progressDir,
                                            cmLocalGenerator::FULL,
@@ -1534,11 +1524,8 @@ void cmMakefileTargetGenerator::WriteTargetDriverRule(
       }
 
     // Make sure the extra files are built.
-    for(std::set<std::string>::const_iterator i = this->ExtraFiles.begin();
-        i != this->ExtraFiles.end(); ++i)
-      {
-      depends.push_back(*i);
-      }
+    depends.insert(depends.end(),
+                   this->ExtraFiles.begin(), this->ExtraFiles.end());
     }
 
   // Write the driver rule.
@@ -1625,11 +1612,7 @@ void cmMakefileTargetGenerator
   if(cmComputeLinkInformation* cli = this->Target->GetLinkInformation(cfg))
     {
     std::vector<std::string> const& libDeps = cli->GetDepends();
-    for(std::vector<std::string>::const_iterator j = libDeps.begin();
-        j != libDeps.end(); ++j)
-      {
-      depends.push_back(*j);
-      }
+    depends.insert(depends.end(), libDeps.begin(), libDeps.end());
     }
 }
 
@@ -1649,12 +1632,8 @@ void cmMakefileTargetGenerator
     }
 
   // Add dependencies on the external object files.
-  for(std::vector<std::string>::const_iterator obj
-        = this->ExternalObjects.begin();
-      obj != this->ExternalObjects.end(); ++obj)
-    {
-    depends.push_back(*obj);
-    }
+  depends.insert(depends.end(),
+                 this->ExternalObjects.begin(), this->ExternalObjects.end());
 
   // Add a dependency on the rule file itself.
   this->LocalGenerator->AppendRuleDepend(depends,
@@ -1765,15 +1744,6 @@ void cmMakefileTargetGenerator::RemoveForbiddenFlags(const char* flagVar,
 
     linkFlags = tmp;
     }
-}
-
-//----------------------------------------------------------------------------
-void
-cmMakefileTargetGenerator
-::AddMultipleOutputPair(const char* depender, const char* dependee)
-{
-  MultipleOutputPairsType::value_type p(depender, dependee);
-  this->MultipleOutputPairs.insert(p);
 }
 
 //----------------------------------------------------------------------------
@@ -1969,7 +1939,8 @@ void cmMakefileTargetGenerator::AddIncludeFlags(std::string& flags,
 
   std::string includeFlags =
     this->LocalGenerator->GetIncludeFlags(includes, this->GeneratorTarget,
-                                          lang, false, useResponseFile);
+                                          lang, false, useResponseFile,
+                                          config);
   if(includeFlags.empty())
     {
     return;

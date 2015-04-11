@@ -9,9 +9,7 @@
   implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
   See the License for more information.
 ============================================================================*/
-#if defined(_MSC_VER) && _MSC_VER < 1300
-# define _WIN32_WINNT 0x0400 /* for wincrypt.h */
-#endif
+
 #include "cmSystemTools.h"
 #include <ctype.h>
 #include <errno.h>
@@ -28,6 +26,7 @@
 #include <cmsys/Encoding.hxx>
 #if defined(CMAKE_BUILD_WITH_CMAKE)
 # include "cmArchiveWrite.h"
+# include "cmLocale.h"
 # include <cm_libarchive.h>
 # include <cmsys/Terminal.h>
 #endif
@@ -65,6 +64,10 @@
 # include "cmELF.h"
 #endif
 
+#if defined(CMAKE_USE_MACH_PARSER)
+# include "cmMachO.h"
+#endif
+
 class cmSystemToolsFileTime
 {
 public:
@@ -76,10 +79,6 @@ public:
   struct utimbuf timeBuf;
 #endif
 };
-
-#if defined(__sgi) && !defined(__GNUC__)
-# pragma set woff 1375 /* base class destructor not virtual */
-#endif
 
 #if !defined(HAVE_ENVIRON_NOT_REQUIRE_PROTOTYPE)
 // For GetEnvironmentVariables
@@ -826,18 +825,12 @@ bool cmSystemTools::RunSingleCommand(
 std::string
 cmSystemTools::PrintSingleCommand(std::vector<std::string> const& command)
 {
-  std::string commandStr;
-  const char* sep = "";
-  for(std::vector<std::string>::const_iterator i = command.begin();
-      i != command.end(); ++i)
+  if (command.empty())
     {
-    commandStr += sep;
-    commandStr += "\"";
-    commandStr += *i;
-    commandStr += "\"";
-    sep = " ";
+    return std::string();
     }
-  return commandStr;
+
+  return "\"" + cmJoin(command, "\" \"") + "\"";
 }
 
 bool cmSystemTools::DoesFileExistWithExtensions(
@@ -1160,7 +1153,7 @@ bool cmSystemTools::SimpleGlob(const std::string& glob,
   std::string path = cmSystemTools::GetFilenamePath(glob);
   std::string ppath = cmSystemTools::GetFilenameName(glob);
   ppath = ppath.substr(0, ppath.size()-1);
-  if ( path.size() == 0 )
+  if (path.empty())
     {
     path = "/";
     }
@@ -1271,11 +1264,7 @@ bool cmSystemTools::Split(const char* s, std::vector<std::string>& l)
 {
   std::vector<std::string> temp;
   bool res = Superclass::Split(s, temp);
-  for(std::vector<std::string>::const_iterator i = temp.begin();
-      i != temp.end(); ++i)
-    {
-    l.push_back(*i);
-    }
+  l.insert(l.end(), temp.begin(), temp.end());
   return res;
 }
 
@@ -1409,7 +1398,7 @@ void cmSystemTools::AppendEnv(std::vector<std::string> const& env)
   for(std::vector<std::string>::const_iterator eit = env.begin();
       eit != env.end(); ++eit)
     {
-    cmSystemTools::PutEnv(eit->c_str());
+    cmSystemTools::PutEnv(*eit);
     }
 }
 
@@ -1480,7 +1469,8 @@ bool cmSystemTools::IsPathToFramework(const char* path)
 
 bool cmSystemTools::CreateTar(const char* outFileName,
                               const std::vector<std::string>& files,
-                              bool gzip, bool bzip2, bool verbose)
+                              cmTarCompression compressType,
+                              bool verbose, std::string const& mtime)
 {
 #if defined(CMAKE_BUILD_WITH_CMAKE)
   std::string cwd = cmSystemTools::GetCurrentWorkingDirectory();
@@ -1494,10 +1484,25 @@ bool cmSystemTools::CreateTar(const char* outFileName,
     cmSystemTools::Error(e.c_str());
     return false;
     }
-  cmArchiveWrite a(fout, (gzip? cmArchiveWrite::CompressGZip :
-                          (bzip2? cmArchiveWrite::CompressBZip2 :
-                           cmArchiveWrite::CompressNone)),
-                           cmArchiveWrite::TypeTAR);
+  cmArchiveWrite::Compress compress = cmArchiveWrite::CompressNone;
+  switch (compressType)
+    {
+    case TarCompressGZip:
+      compress = cmArchiveWrite::CompressGZip;
+      break;
+    case TarCompressBZip2:
+      compress = cmArchiveWrite::CompressBZip2;
+      break;
+    case TarCompressXZ:
+      compress = cmArchiveWrite::CompressXZ;
+      break;
+    case TarCompressNone:
+      compress = cmArchiveWrite::CompressNone;
+      break;
+    }
+  cmArchiveWrite a(fout, compress,
+                   cmArchiveWrite::TypeTAR);
+  a.SetMTime(mtime);
   a.SetVerbose(verbose);
   for(std::vector<std::string>::const_iterator i = files.begin();
       i != files.end(); ++i)
@@ -1522,7 +1527,6 @@ bool cmSystemTools::CreateTar(const char* outFileName,
 #else
   (void)outFileName;
   (void)files;
-  (void)gzip;
   (void)verbose;
   return false;
 #endif
@@ -1687,6 +1691,8 @@ long copy_data(struct archive *ar, struct archive *aw)
 bool extract_tar(const char* outFileName, bool verbose,
                  bool extract)
 {
+  cmLocaleRAII localeRAII;
+  static_cast<void>(localeRAII);
   struct archive* a = archive_read_new();
   struct archive *ext = archive_write_disk_new();
   archive_read_support_compression_all(a);
@@ -1783,7 +1789,7 @@ bool extract_tar(const char* outFileName, bool verbose,
 #endif
 
 bool cmSystemTools::ExtractTar(const char* outFileName,
-                               bool , bool verbose)
+                               bool verbose)
 {
 #if defined(CMAKE_BUILD_WITH_CMAKE)
   return extract_tar(outFileName, verbose, true);
@@ -1795,7 +1801,6 @@ bool cmSystemTools::ExtractTar(const char* outFileName,
 }
 
 bool cmSystemTools::ListTar(const char* outFileName,
-                            bool ,
                             bool verbose)
 {
 #if defined(CMAKE_BUILD_WITH_CMAKE)
@@ -2333,7 +2338,7 @@ bool cmSystemTools::GuessLibrarySOName(std::string const& fullPath,
     {
     return false;
     }
-  if(!cmSystemTools::ReadSymlink(fullPath.c_str(), soname))
+  if(!cmSystemTools::ReadSymlink(fullPath, soname))
     {
     return false;
     }
@@ -2359,31 +2364,17 @@ bool cmSystemTools::GuessLibrarySOName(std::string const& fullPath,
 bool cmSystemTools::GuessLibraryInstallName(std::string const& fullPath,
                                        std::string& soname)
 {
-  std::vector<std::string> cmds;
-  cmds.push_back("otool");
-  cmds.push_back("-D");
-  cmds.push_back(fullPath);
-
-  std::string output;
-  if(!RunSingleCommand(cmds, &output, 0, 0, OUTPUT_NONE))
+#if defined(CMAKE_USE_MACH_PARSER)
+  cmMachO macho(fullPath.c_str());
+  if(macho)
     {
-    cmds.insert(cmds.begin(), "-r");
-    cmds.insert(cmds.begin(), "xcrun");
-    if(!RunSingleCommand(cmds, &output, 0, 0, OUTPUT_NONE))
-      {
-      return false;
-      }
+    return macho.GetInstallName(soname);
     }
+#else
+  (void)fullPath;
+  (void)soname;
+#endif
 
-  std::vector<std::string> strs = cmSystemTools::tokenize(output, "\n");
-  // otool returns extra lines reporting multiple install names
-  // in case the binary is multi-arch and none of the architectures
-  // is native (e.g. i386;ppc on x86_64)
-  if(strs.size() >= 2)
-    {
-    soname = strs[1];
-    return true;
-    }
   return false;
 }
 
@@ -2517,7 +2508,7 @@ bool cmSystemTools::ChangeRPath(std::string const& file,
         }
       if(emsg)
         {
-        cmOStringStream e;
+        std::ostringstream e;
         e << "The current " << se_name[i] << " is:\n"
           << "  " << se[i]->Value << "\n"
           << "which does not contain:\n"
@@ -2924,4 +2915,13 @@ std::vector<std::string> cmSystemTools::tokenize(const std::string& str,
     tokens.push_back("");
     }
   return tokens;
+}
+
+//----------------------------------------------------------------------------
+bool cmSystemTools::StringToLong(const char* str, long* value)
+{
+  errno = 0;
+  char *endp;
+  *value = strtol(str, &endp, 10);
+  return (*endp == '\0') && (endp != str) && (errno == 0);
 }

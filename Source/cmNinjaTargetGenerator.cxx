@@ -170,8 +170,10 @@ cmNinjaTargetGenerator::ComputeFlagsForObject(cmSourceFile const* source,
     std::string includeFlags =
       this->LocalGenerator->GetIncludeFlags(includes, this->GeneratorTarget,
                                             language,
-      language == "RC" ? true : false); // full include paths for RC
+      language == "RC" ? true : false,  // full include paths for RC
                                         // needed by cmcldeps
+                                            false,
+                                            this->GetConfigName());
     if(cmGlobalNinjaGenerator::IsMinGW())
       cmSystemTools::ReplaceString(includeFlags, "\\", "/");
 
@@ -198,20 +200,20 @@ cmNinjaTargetGenerator::ComputeFlagsForObject(cmSourceFile const* source,
   return flags;
 }
 
-
-bool cmNinjaTargetGenerator::needsDepFile(const std::string& lang)
+bool cmNinjaTargetGenerator::NeedDepTypeMSVC(const std::string& lang) const
 {
-  cmMakefile* mf = this->GetMakefile();
-
-  const bool usingMSVC = std::string("MSVC") ==
-                       (mf->GetDefinition("CMAKE_C_COMPILER_ID") ?
-                    mf->GetSafeDefinition("CMAKE_C_COMPILER_ID") :
-                    mf->GetSafeDefinition("CMAKE_CXX_COMPILER_ID"));
-
-  return !usingMSVC || lang == "RC";
+  if (lang == "C" || lang == "CXX")
+    {
+    cmMakefile* mf = this->GetMakefile();
+    return (
+      strcmp(mf->GetSafeDefinition("CMAKE_C_COMPILER_ID"), "MSVC") == 0 ||
+      strcmp(mf->GetSafeDefinition("CMAKE_CXX_COMPILER_ID"), "MSVC") == 0 ||
+      strcmp(mf->GetSafeDefinition("CMAKE_C_SIMULATE_ID"), "MSVC") == 0 ||
+      strcmp(mf->GetSafeDefinition("CMAKE_CXX_SIMULATE_ID"), "MSVC") == 0
+      );
+    }
+  return false;
 }
-
-
 
 // TODO: Refactor with
 // void cmMakefileTargetGenerator::WriteTargetLanguageFlags().
@@ -389,22 +391,22 @@ cmNinjaTargetGenerator
 
   cmMakefile* mf = this->GetMakefile();
 
-  const std::string cId = mf->GetDefinition("CMAKE_C_COMPILER_ID")
-                          ? mf->GetSafeDefinition("CMAKE_C_COMPILER_ID")
-                          : mf->GetSafeDefinition("CMAKE_CXX_COMPILER_ID");
-  const std::string sId = mf->GetDefinition("CMAKE_C_SIMULATE_ID")
-                          ? mf->GetSafeDefinition("CMAKE_C_SIMULATE_ID")
-                          : mf->GetSafeDefinition("CMAKE_CXX_SIMULATE_ID");
-  const bool usingMSVC = (cId == "MSVC" || sId == "MSVC");
-
   // Tell ninja dependency format so all deps can be loaded into a database
   std::string deptype;
   std::string depfile;
   std::string cldeps;
   std::string flags = "$FLAGS";
-  if (usingMSVC)
+  if (this->NeedDepTypeMSVC(lang))
     {
-    if (!mf->GetIsSourceFileTryCompile() && lang == "RC")
+    deptype = "msvc";
+    depfile = "";
+    flags += " /showIncludes";
+    }
+  else if (lang == "RC" && this->NeedDepTypeMSVC("C"))
+    {
+    // For the MS resource compiler we need cmcldeps, but skip dependencies
+    // for source-file try_compile cases because they are always fresh.
+    if (!mf->GetIsSourceFileTryCompile())
       {
       deptype = "gcc";
       depfile = "$DEP_FILE";
@@ -416,12 +418,6 @@ cmNinjaTargetGenerator
       cldeps += "\" " + lang + " $in \"$DEP_FILE\" $out \"";
       cldeps += mf->GetSafeDefinition("CMAKE_CL_SHOWINCLUDES_PREFIX");
       cldeps += "\" \"" + cl + "\" ";
-      }
-    else
-      {
-      deptype = "msvc";
-      depfile = "";
-      flags += " /showIncludes";
       }
     }
   else
@@ -468,9 +464,9 @@ cmNinjaTargetGenerator
 
 
   // Write the rule for compiling file of the given language.
-  cmOStringStream comment;
+  std::ostringstream comment;
   comment << "Rule for compiling " << lang << " files.";
-  cmOStringStream description;
+  std::ostringstream description;
   description << "Building " << lang << " object $out";
   this->GetGlobalGenerator()->AddRule(this->LanguageCompilerRule(lang),
                                       cmdLine,
@@ -480,7 +476,7 @@ cmNinjaTargetGenerator
                                       deptype,
                                       /*rspfile*/ "",
                                       /*rspcontent*/ "",
-                                      /*restat*/ false,
+                                      /*restat*/ "",
                                       /*generator*/ false);
 }
 
@@ -541,7 +537,10 @@ cmNinjaTargetGenerator
     cmCustomCommandGenerator ccg(*cc, this->GetConfigName(),
                                  this->GetMakefile());
     const std::vector<std::string>& ccoutputs = ccg.GetOutputs();
+    const std::vector<std::string>& ccbyproducts= ccg.GetByproducts();
     std::transform(ccoutputs.begin(), ccoutputs.end(),
+                   std::back_inserter(orderOnlyDeps), MapToNinjaPath());
+    std::transform(ccbyproducts.begin(), ccbyproducts.end(),
                    std::back_inserter(orderOnlyDeps), MapToNinjaPath());
     }
 
@@ -600,6 +599,14 @@ cmNinjaTargetGenerator
   if(const char* objectDeps = source->GetProperty("OBJECT_DEPENDS")) {
     std::vector<std::string> depList;
     cmSystemTools::ExpandListArgument(objectDeps, depList);
+    for(std::vector<std::string>::iterator odi = depList.begin();
+        odi != depList.end(); ++odi)
+      {
+      if (cmSystemTools::FileIsFullPath(*odi))
+        {
+        *odi = cmSystemTools::CollapseFullPath(*odi);
+        }
+      }
     std::transform(depList.begin(), depList.end(),
                    std::back_inserter(implicitDeps), MapToNinjaPath());
   }
@@ -623,7 +630,7 @@ cmNinjaTargetGenerator
   cmNinjaVars vars;
   vars["FLAGS"] = this->ComputeFlagsForObject(source, language);
   vars["DEFINES"] = this->ComputeDefines(source, language);
-  if (needsDepFile(language)) {
+  if (!this->NeedDepTypeMSVC(language)) {
     vars["DEP_FILE"] =
             cmGlobalNinjaGenerator::EncodeDepfileSpace(objectFileName + ".d");
   }

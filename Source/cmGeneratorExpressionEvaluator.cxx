@@ -36,7 +36,7 @@ void reportError(cmGeneratorExpressionContext *context,
     return;
     }
 
-  cmOStringStream e;
+  std::ostringstream e;
   e << "Error evaluating generator expression:\n"
     << "  " << expr << "\n"
     << result;
@@ -362,7 +362,7 @@ static const struct MakeCIdentifierNode : public cmGeneratorExpressionNode
                        const GeneratorExpressionContent *,
                        cmGeneratorExpressionDAGChecker *) const
   {
-    return cmSystemTools::MakeCidentifier(parameters.front().c_str());
+    return cmSystemTools::MakeCidentifier(parameters.front());
   }
 } makeCIdentifierNode;
 
@@ -429,7 +429,7 @@ struct CompilerIdNode : public cmGeneratorExpressionNode
   {
     const char *compilerId =
       context->Makefile->GetSafeDefinition("CMAKE_" + lang + "_COMPILER_ID");
-    if (parameters.size() == 0)
+    if (parameters.empty())
       {
       return compilerId ? compilerId : "";
       }
@@ -456,7 +456,7 @@ struct CompilerIdNode : public cmGeneratorExpressionNode
         {
         case cmPolicies::WARN:
           {
-          cmOStringStream e;
+          std::ostringstream e;
           e << context->Makefile->GetPolicies()
                       ->GetPolicyWarning(cmPolicies::CMP0044);
           context->Makefile->GetCMakeInstance()
@@ -534,7 +534,7 @@ struct CompilerVersionNode : public cmGeneratorExpressionNode
   {
     const char *compilerVersion = context->Makefile->GetSafeDefinition(
         "CMAKE_" + lang + "_COMPILER_VERSION");
-    if (parameters.size() == 0)
+    if (parameters.empty())
       {
       return compilerVersion ? compilerVersion : "";
       }
@@ -616,7 +616,7 @@ struct PlatformIdNode : public cmGeneratorExpressionNode
   {
     const char *platformId =
       context->Makefile->GetSafeDefinition("CMAKE_SYSTEM_NAME");
-    if (parameters.size() == 0)
+    if (parameters.empty())
       {
       return platformId ? platformId : "";
       }
@@ -803,18 +803,9 @@ static const struct JoinNode : public cmGeneratorExpressionNode
                        const GeneratorExpressionContent *,
                        cmGeneratorExpressionDAGChecker *) const
   {
-    std::string result;
-
     std::vector<std::string> list;
     cmSystemTools::ExpandListArgument(parameters.front(), list);
-    std::string sep;
-    for(std::vector<std::string>::const_iterator li = list.begin();
-      li != list.end(); ++li)
-      {
-      result += sep + *li;
-      sep = parameters[1];
-      }
-    return result;
+    return cmJoin(list, parameters[1]);
   }
 } joinNode;
 
@@ -953,14 +944,14 @@ static const struct TargetPropertyNode : public cmGeneratorExpressionNode
 
       if (!target)
         {
-        cmOStringStream e;
+        std::ostringstream e;
         e << "Target \""
           << targetName
           << "\" not found.";
         reportError(context, content->GetOriginalExpression(), e.str());
         return std::string();
         }
-        context->AllTargets.insert(target);
+      context->AllTargets.insert(target);
       }
 
     if (target == context->HeadTarget)
@@ -970,6 +961,10 @@ static const struct TargetPropertyNode : public cmGeneratorExpressionNode
       // will check this to ensure that properties have one consistent
       // value for all evaluations.
       context->SeenTargetProperties.insert(propertyName);
+      }
+    if (propertyName == "SOURCES")
+      {
+      context->SourceSensitiveTargets.insert(target);
       }
 
     if (propertyName.empty())
@@ -1249,7 +1244,7 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
   {
     if (!context->EvaluateForBuildsystem)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "The evaluation of the TARGET_OBJECTS generator expression "
         "is only suitable for consumption by CMake.  It is not suitable "
         "for writing out elsewhere.";
@@ -1262,7 +1257,7 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
                 context->Makefile->FindGeneratorTargetToUse(tgtName);
     if (!gt)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Objects of target \"" << tgtName
         << "\" referenced but no such target exists.";
       reportError(context, content->GetOriginalExpression(), e.str());
@@ -1270,7 +1265,7 @@ static const struct TargetObjectsNode : public cmGeneratorExpressionNode
       }
     if (gt->GetType() != cmTarget::OBJECT_LIBRARY)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Objects of target \"" << tgtName
         << "\" referenced but is not an OBJECT library.";
       reportError(context, content->GetOriginalExpression(), e.str());
@@ -1375,6 +1370,8 @@ static const struct CompileFeaturesNode : public cmGeneratorExpressionNode
       {
       std::vector<std::string> const& langAvailable
                                               = availableFeatures[lit->first];
+      const char* standardDefault = context->Makefile
+        ->GetDefinition("CMAKE_" + lit->first + "_STANDARD_DEFAULT");
       for (std::vector<std::string>::const_iterator it = lit->second.begin();
           it != lit->second.end(); ++it)
         {
@@ -1382,6 +1379,12 @@ static const struct CompileFeaturesNode : public cmGeneratorExpressionNode
                                                       == langAvailable.end())
           {
           return "0";
+          }
+        if (standardDefault && !*standardDefault)
+          {
+          // This compiler has no notion of language standard levels.
+          // All features known for the language are always available.
+          continue;
           }
         if (!context->Makefile->HaveStandardAvailable(target,
                                                       lit->first, *it))
@@ -1391,8 +1394,7 @@ static const struct CompileFeaturesNode : public cmGeneratorExpressionNode
             const char* l = target->GetProperty(lit->first + "_STANDARD");
             if (!l)
               {
-              l = context->Makefile
-                  ->GetDefinition("CMAKE_" + lit->first + "_STANDARD_DEFAULT");
+              l = standardDefault;
               }
             assert(l);
             context->MaxLanguageStandard[target][lit->first] = l;
@@ -1432,7 +1434,7 @@ cmPolicies::PolicyStatus statusForTarget(cmTarget const* tgt,
 
 #undef RETURN_POLICY
 
-  assert("!Unreachable code. Not a valid policy");
+  assert(0 && "Unreachable code. Not a valid policy");
   return cmPolicies::WARN;
 }
 
@@ -1448,7 +1450,7 @@ cmPolicies::PolicyID policyForString(const char *policy_id)
 
 #undef RETURN_POLICY_ID
 
-  assert("!Unreachable code. Not a valid policy");
+  assert(0 && "Unreachable code. Not a valid policy");
   return cmPolicies::CMP0002;
 }
 
@@ -2031,7 +2033,7 @@ std::string GeneratorExpressionContent::EvaluateParameters(
       }
     else
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "$<" + identifier + "> expression requires "
         << numExpected
         << " comma separated parameters, but got "
@@ -2057,30 +2059,9 @@ std::string GeneratorExpressionContent::EvaluateParameters(
 }
 
 //----------------------------------------------------------------------------
-static void deleteAll(const std::vector<cmGeneratorExpressionEvaluator*> &c)
-{
-  std::vector<cmGeneratorExpressionEvaluator*>::const_iterator it
-                                                  = c.begin();
-  const std::vector<cmGeneratorExpressionEvaluator*>::const_iterator end
-                                                  = c.end();
-  for ( ; it != end; ++it)
-    {
-    delete *it;
-    }
-}
-
-//----------------------------------------------------------------------------
 GeneratorExpressionContent::~GeneratorExpressionContent()
 {
-  deleteAll(this->IdentifierChildren);
-
-  typedef std::vector<cmGeneratorExpressionEvaluator*> EvaluatorVector;
-  std::vector<EvaluatorVector>::const_iterator pit =
-                                                  this->ParamChildren.begin();
-  const std::vector<EvaluatorVector>::const_iterator pend =
-                                                  this->ParamChildren.end();
-  for ( ; pit != pend; ++pit)
-    {
-    deleteAll(*pit);
-    }
+  cmDeleteAll(this->IdentifierChildren);
+  std::for_each(this->ParamChildren.begin(), this->ParamChildren.end(),
+                cmDeleteAll<std::vector<cmGeneratorExpressionEvaluator*> >);
 }

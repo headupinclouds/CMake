@@ -70,6 +70,8 @@ public:
                                         const std::string& suffix,
                                         std::string& dir);
 
+  virtual void FindMakeProgram(cmMakefile*);
+
   ///! What is the configurations directory variable called?
   virtual const char* GetCMakeCFGIntDir() const;
   ///! expand CFGIntDir
@@ -118,8 +120,7 @@ private:
   void CreateCustomRulesMakefile(const char* makefileBasename,
                                  cmTarget& target,
                                  std::vector<cmCustomCommand> const & commands,
-                                 const std::string& configName,
-                                 bool& haveMultipleOutputPairs);
+                                 const std::string& configName);
 
   cmXCodeObject* FindXCodeTarget(cmTarget const*);
   std::string GetOrCreateId(const std::string& name, const std::string& id);
@@ -213,6 +214,11 @@ protected:
   std::vector<cmXCodeObject*> XCodeObjects;
   cmXCodeObject* RootObject;
 private:
+  std::string const& GetXcodeBuildCommand();
+  std::string FindXcodeBuildCommand();
+  std::string XcodeBuildCommand;
+  bool XcodeBuildCommandInitialized;
+
   void PrintCompilerAdvice(std::ostream&, std::string const&,
                            const char*) const {}
 
@@ -241,6 +247,7 @@ private:
   std::map<std::string, cmXCodeObject* > GroupNameMap;
   std::map<std::string, cmXCodeObject* > TargetGroup;
   std::map<std::string, cmXCodeObject* > FileRefs;
+  std::map<cmTarget const*, cmXCodeObject* > XCodeObjectMap;
   std::vector<std::string> Architectures;
   std::string GeneratorToolset;
 };

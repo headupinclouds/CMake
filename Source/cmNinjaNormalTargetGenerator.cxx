@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <algorithm>
+#include <limits>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -207,12 +208,7 @@ cmNinjaNormalTargetGenerator
 
     vars.ObjectDir = "$OBJECT_DIR";
 
-    // TODO:
-    // Makefile generator expands <TARGET> to the plain target name
-    // with suffix. $out expands to a relative path. This difference
-    // could make trouble when switching to Ninja generator. Maybe
-    // using TARGET_NAME and RuleVariables::TargetName is a fix.
-    vars.Target = "$out";
+    vars.Target = "$TARGET_FILE";
 
     vars.SONameFlag = "$SONAME_FLAG";
     vars.TargetSOName = "$SONAME";
@@ -223,8 +219,8 @@ cmNinjaNormalTargetGenerator
     std::string targetVersionMajor;
     std::string targetVersionMinor;
     {
-    cmOStringStream majorStream;
-    cmOStringStream minorStream;
+    std::ostringstream majorStream;
+    std::ostringstream minorStream;
     int major;
     int minor;
     this->GetTarget()->GetTargetVersion(major, minor);
@@ -260,12 +256,12 @@ cmNinjaNormalTargetGenerator
       this->GetLocalGenerator()->BuildCommandLine(linkCmds);
 
     // Write the linker rule with response file if needed.
-    cmOStringStream comment;
+    std::ostringstream comment;
     comment << "Rule for linking " << this->TargetLinkLanguage << " "
             << this->GetVisibleTypeName() << ".";
-    cmOStringStream description;
+    std::ostringstream description;
     description << "Linking " << this->TargetLinkLanguage << " "
-                << this->GetVisibleTypeName() << " $out";
+                << this->GetVisibleTypeName() << " $TARGET_FILE";
     this->GetGlobalGenerator()->AddRule(ruleName,
                                         linkCmd,
                                         description.str(),
@@ -274,7 +270,7 @@ cmNinjaNormalTargetGenerator
                                         /*deptype*/ "",
                                         rspfile,
                                         rspcontent,
-                                        /*restat*/ false,
+                                        /*restat*/ "$RESTAT",
                                         /*generator*/ false);
   }
 
@@ -296,7 +292,7 @@ cmNinjaNormalTargetGenerator
                                           /*deptype*/ "",
                                           /*rspfile*/ "",
                                           /*rspcontent*/ "",
-                                          /*restat*/ false,
+                                          /*restat*/ "",
                                           /*generator*/ false);
     else
       this->GetGlobalGenerator()->AddRule("CMAKE_SYMLINK_LIBRARY",
@@ -310,7 +306,7 @@ cmNinjaNormalTargetGenerator
                                           /*deptype*/ "",
                                           /*rspfile*/ "",
                                           /*rspcontent*/ "",
-                                          /*restat*/ false,
+                                          /*restat*/ "",
                                           /*generator*/ false);
   }
 }
@@ -339,7 +335,7 @@ cmNinjaNormalTargetGenerator
         this->GetLocalGenerator()->ConvertToOutputFormat(
           mf->GetRequiredDefinition("CMAKE_COMMAND"),
           cmLocalGenerator::SHELL);
-      linkCmds.push_back(cmakeCommand + " -E remove $out");
+      linkCmds.push_back(cmakeCommand + " -E remove $TARGET_FILE");
       }
       // TODO: Use ARCHIVE_APPEND for archives over a certain size.
       {
@@ -371,15 +367,29 @@ cmNinjaNormalTargetGenerator
 
 static int calculateCommandLineLengthLimit(int linkRuleLength)
 {
+  static int const limits[] = {
 #ifdef _WIN32
-  return 8000 - linkRuleLength;
-#elif defined(__linux) || defined(__APPLE__) || defined(__HAIKU__)
-  // for instance ARG_MAX is 2096152 on Ubuntu or 262144 on Mac
-  return ((int)sysconf(_SC_ARG_MAX)) - linkRuleLength - 1000;
-#else
-  (void)linkRuleLength;
-  return -1;
+    8000,
 #endif
+#if defined(__APPLE__) || defined(__HAIKU__) || defined(__linux)
+    // for instance ARG_MAX is 2096152 on Ubuntu or 262144 on Mac
+    ((int)sysconf(_SC_ARG_MAX)) - 1000,
+#endif
+#if defined(__linux)
+    // #define MAX_ARG_STRLEN (PAGE_SIZE * 32) in Linux's binfmts.h
+    ((int)sysconf(_SC_PAGESIZE) * 32) - 1000,
+#endif
+    std::numeric_limits<int>::max()
+  };
+
+  size_t const arrSz = cmArraySize(limits);
+  int const sz = *std::min_element(limits, limits + arrSz);
+  if (sz == std::numeric_limits<int>::max())
+    {
+    return -1;
+    }
+
+  return sz - linkRuleLength;
 }
 
 
@@ -440,7 +450,7 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
   cmNinjaVars vars;
 
   // Compute the comment.
-  cmOStringStream comment;
+  std::ostringstream comment;
   comment <<
     "Link the " << this->GetVisibleTypeName() << " " << targetOutputReal;
 
@@ -463,6 +473,10 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
                                     this->GetConfigName());
   bool useWatcomQuote = mf->IsOn(createRule+"_USE_WATCOM_QUOTE");
   cmLocalNinjaGenerator& localGen = *this->GetLocalGenerator();
+
+  vars["TARGET_FILE"] =
+    localGen.ConvertToOutputFormat(targetOutputReal, cmLocalGenerator::SHELL);
+
   localGen.GetTargetFlags(vars["LINK_LIBRARIES"],
                           vars["FLAGS"],
                           vars["LINK_FLAGS"],
@@ -522,6 +536,10 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
                                               cmLocalGenerator::SHELL);
     vars["TARGET_IMPLIB"] = impLibPath;
     EnsureParentDirectoryExists(impLibPath);
+    if(target.HasImportLibrary())
+      {
+      outputs.push_back(targetOutputImplib);
+      }
     }
 
   if (!this->SetMsvcTargetPdbVariable(vars))
@@ -566,6 +584,7 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
     &postBuildCmdLines
   };
 
+  cmNinjaDeps byproducts;
   for (unsigned i = 0; i != 3; ++i)
     {
     for (std::vector<cmCustomCommand>::const_iterator
@@ -574,6 +593,9 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
       {
       cmCustomCommandGenerator ccg(*ci, cfgName, mf);
       localGen.AppendCustomCommandLines(ccg, *cmdLineLists[i]);
+      std::vector<std::string> const& ccByproducts = ccg.GetByproducts();
+      std::transform(ccByproducts.begin(), ccByproducts.end(),
+                     std::back_inserter(byproducts), MapToNinjaPath());
       }
     }
 
@@ -620,6 +642,17 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
   cmNinjaDeps orderOnlyDeps;
   this->GetLocalGenerator()->AppendTargetDepends(this->GetTarget(),
     orderOnlyDeps);
+
+  // Ninja should restat after linking if and only if there are byproducts.
+  vars["RESTAT"] = byproducts.empty()? "" : "1";
+
+  for (cmNinjaDeps::const_iterator oi = byproducts.begin(),
+         oe = byproducts.end();
+       oi != oe; ++oi)
+    {
+    this->GetGlobalGenerator()->SeenCustomCommandOutput(*oi);
+    outputs.push_back(*oi);
+    }
 
   // Write the build statement for this target.
   globalGen.WriteBuild(this->GetBuildFileStream(),
@@ -670,16 +703,6 @@ void cmNinjaNormalTargetGenerator::WriteLinkStatement()
                                   emptyDeps,
                                   symlinkVars);
       }
-    }
-
-  if (!this->TargetNameImport.empty())
-    {
-    // Since using multiple outputs would mess up the $out variable, use an
-    // alias for the import library.
-    globalGen.WritePhonyBuild(this->GetBuildFileStream(),
-                              "Alias for import library.",
-                              cmNinjaDeps(1, targetOutputImplib),
-                              cmNinjaDeps(1, targetOutputReal));
     }
 
   // Add aliases for the file name and the target name.

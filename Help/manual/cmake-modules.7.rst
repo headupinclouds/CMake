@@ -63,6 +63,7 @@ All Modules
    /module/CPack
    /module/CPackWIX
    /module/CTest
+   /module/CTestCoverageCollectGCOV
    /module/CTestScriptMode
    /module/CTestUseLaunchers
    /module/Dart
@@ -108,6 +109,7 @@ All Modules
    /module/FindGLUT
    /module/FindGnuplot
    /module/FindGnuTLS
+   /module/FindGSL
    /module/FindGTest
    /module/FindGTK2
    /module/FindGTK
@@ -118,6 +120,7 @@ All Modules
    /module/FindIce
    /module/FindIcotool
    /module/FindImageMagick
+   /module/FindIntl
    /module/FindITK
    /module/FindJasper
    /module/FindJava

@@ -21,9 +21,9 @@
 #include "cmExportSetMap.h" // For cmExportSetMap
 #include "cmGeneratorTarget.h"
 #include "cmGeneratorExpression.h"
-#include "cmFileLockPool.h"
 
 #if defined(CMAKE_BUILD_WITH_CMAKE)
+# include "cmFileLockPool.h"
 # include <cmsys/hash_map.hxx>
 #endif
 
@@ -255,9 +255,9 @@ public:
   cmTargetManifest const& GetTargetManifest() const
     { return this->TargetManifest; }
 
-  /** Get the content of a directory.  Directory listings are loaded
-      from disk at most once and cached.  During the generation step
-      the content will include the target files to be built even if
+  /** Get the content of a directory.  Directory listings are cached
+      and re-loaded from disk only when modified.  During the generation
+      step the content will include the target files to be built even if
       they do not yet exist.  */
   std::set<std::string> const& GetDirectoryContent(std::string const& dir,
                                                    bool needDisk = true);
@@ -342,7 +342,16 @@ public:
 
   bool GenerateCPackPropertiesFile();
 
+  void CreateEvaluationSourceFiles(std::string const& config) const;
+
+  void SetFilenameTargetDepends(cmSourceFile* sf,
+                                std::set<cmTarget const*> tgts);
+  std::set<cmTarget const*> const&
+  GetFilenameTargetDepends(cmSourceFile* sf) const;
+
+#if defined(CMAKE_BUILD_WITH_CMAKE)
   cmFileLockPool& GetFileLockPool() { return FileLockPool; }
+#endif
 
 protected:
   virtual void Generate();
@@ -381,7 +390,8 @@ protected:
   void CreateDefaultGlobalTargets(cmTargets* targets);
   cmTarget CreateGlobalTarget(const std::string& name, const char* message,
     const cmCustomCommandLines* commandLines,
-    std::vector<std::string> depends, const char* workingDir);
+    std::vector<std::string> depends, const char* workingDir,
+    bool uses_terminal);
 
   bool NeedSymbolicMark;
   bool UseLinkScript;
@@ -476,13 +486,14 @@ private:
   virtual const char* GetBuildIgnoreErrorsFlag() const { return 0; }
 
   // Cache directory content and target files to be built.
-  struct DirectoryContent: public std::set<std::string>
+  struct DirectoryContent
   {
-    typedef std::set<std::string> derived;
-    bool LoadedFromDisk;
-    DirectoryContent(): LoadedFromDisk(false) {}
+    long LastDiskTime;
+    std::set<std::string> All;
+    std::set<std::string> Generated;
+    DirectoryContent(): LastDiskTime(-1) {}
     DirectoryContent(DirectoryContent const& dc):
-      derived(dc), LoadedFromDisk(dc.LoadedFromDisk) {}
+      LastDiskTime(dc.LastDiskTime), All(dc.All), Generated(dc.Generated) {}
   };
   std::map<std::string, DirectoryContent> DirectoryContentMap;
 
@@ -492,8 +503,13 @@ private:
   // track targets to issue CMP0042 warning for.
   std::set<std::string> CMP0042WarnTargets;
 
+  mutable std::map<cmSourceFile*, std::set<cmTarget const*> >
+  FilenameTargetDepends;
+
+#if defined(CMAKE_BUILD_WITH_CMAKE)
   // Pool of file locks
   cmFileLockPool FileLockPool;
+#endif
 };
 
 #endif

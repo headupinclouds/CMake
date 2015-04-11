@@ -31,6 +31,7 @@ These commands may be used freely in CMake projects.
    /command/cmake_minimum_required
    /command/cmake_policy
    /command/configure_file
+   /command/continue
    /command/create_test_sourcelist
    /command/define_property
    /command/elseif
@@ -67,6 +68,7 @@ These commands may be used freely in CMake projects.
    /command/include
    /command/install
    /command/link_directories
+   /command/link_libraries
    /command/list
    /command/load_cache
    /command/load_command
@@ -117,7 +119,6 @@ versions of CMake.  Do not use them in new code.
    /command/install_files
    /command/install_programs
    /command/install_targets
-   /command/link_libraries
    /command/make_directory
    /command/output_required_files
    /command/remove

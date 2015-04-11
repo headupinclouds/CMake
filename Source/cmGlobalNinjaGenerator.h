@@ -103,6 +103,7 @@ public:
   void WriteCustomCommandBuild(const std::string& command,
                                const std::string& description,
                                const std::string& comment,
+                               bool uses_terminal,
                                const cmNinjaDeps& outputs,
                                const cmNinjaDeps& deps = cmNinjaDeps(),
                                const cmNinjaDeps& orderOnly = cmNinjaDeps());
@@ -124,7 +125,7 @@ public:
                         const std::string& deptype,
                         const std::string& rspfile,
                         const std::string& rspcontent,
-                        bool restat,
+                        const std::string& restat,
                         bool generator);
 
   /**
@@ -244,7 +245,7 @@ public:
                const std::string& deptype,
                const std::string& rspfile,
                const std::string& rspcontent,
-               bool restat,
+               const std::string& restat,
                bool generator);
 
   bool HasRule(const std::string& name);
@@ -299,6 +300,9 @@ public:
   virtual void ComputeTargetObjectDirectory(cmGeneratorTarget* gt) const;
 
   std::string ninjaVersion() const;
+
+  bool SupportsConsolePool() const;
+
 protected:
 
   /// Overloaded methods. @see cmGlobalGenerator::Generate()

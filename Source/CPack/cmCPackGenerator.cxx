@@ -160,7 +160,7 @@ int cmCPackGenerator::PrepareNames()
         "Cannot open description file name: " << descFileName << std::endl);
       return 0;
       }
-    cmOStringStream ostr;
+    std::ostringstream ostr;
     std::string line;
 
     cmCPackLogger(cmCPackLog::LOG_VERBOSE,
@@ -217,7 +217,7 @@ int cmCPackGenerator::InstallProject()
     {
     std::string destDir = "DESTDIR=";
     destDir += tempInstallDirectory;
-    cmSystemTools::PutEnv(destDir.c_str());
+    cmSystemTools::PutEnv(destDir);
     }
   else
     {
@@ -277,7 +277,7 @@ int cmCPackGenerator::InstallProjectViaInstallCommands(
     {
     std::string tempInstallDirectoryEnv = "CMAKE_INSTALL_PREFIX=";
     tempInstallDirectoryEnv += tempInstallDirectory;
-    cmSystemTools::PutEnv(tempInstallDirectoryEnv.c_str());
+    cmSystemTools::PutEnv(tempInstallDirectoryEnv);
     std::vector<std::string> installCommandsVector;
     cmSystemTools::ExpandListArgument(installCommands,installCommandsVector);
     std::vector<std::string>::iterator it;
@@ -404,7 +404,7 @@ int cmCPackGenerator::InstallProjectViaInstalledDirectories(
           std::string targetFile;
           std::string inFileRelative =
              cmSystemTools::RelativePath(top.c_str(),inFile.c_str());
-          cmSystemTools::ReadSymlink(inFile.c_str(),targetFile);
+          cmSystemTools::ReadSymlink(inFile,targetFile);
           symlinkedFiles.push_back(std::pair<std::string,
                                    std::string>(targetFile,inFileRelative));
           }
@@ -421,7 +421,7 @@ int cmCPackGenerator::InstallProjectViaInstalledDirectories(
           }
         }
       /* rebuild symlinks in the installed tree */
-      if (symlinkedFiles.size()>0)
+      if (!symlinkedFiles.empty())
         {
         std::list< std::pair<std::string,std::string> >::iterator symlinkedIt;
         std::string curDir = cmSystemTools::GetCurrentWorkingDirectory();
@@ -437,8 +437,20 @@ int cmCPackGenerator::InstallProjectViaInstalledDirectories(
           cmCPackLogger(cmCPackLog::LOG_DEBUG, "Will create a symlink: "
                          << symlinkedIt->second << "--> "
                          << symlinkedIt->first << std::endl);
-          if (!cmSystemTools::CreateSymlink((symlinkedIt->first).c_str(),
-                                            (symlinkedIt->second).c_str()))
+          // make sure directory exists for symlink
+          std::string destDir =
+            cmSystemTools::GetFilenamePath(symlinkedIt->second);
+          if(!destDir.empty() && !cmSystemTools::MakeDirectory(destDir))
+            {
+            cmCPackLogger(cmCPackLog::LOG_ERROR, "Cannot create dir: "
+                          << destDir
+                          << "\nTrying to create symlink: "
+                          << symlinkedIt->second << "--> "
+                          << symlinkedIt->first
+                          << std::endl);
+            }
+          if (!cmSystemTools::CreateSymlink(symlinkedIt->first,
+                                            symlinkedIt->second))
             {
             cmCPackLogger(cmCPackLog::LOG_ERROR, "Cannot create symlink: "
                             << symlinkedIt->second << "--> "
@@ -795,7 +807,7 @@ int cmCPackGenerator::InstallProjectViaInstallCMakeProjects(
            *       in order to put things in subdirs...
            */
           cmSystemTools::PutEnv(
-              (std::string("DESTDIR=")+tempInstallDirectory).c_str()
+              std::string("DESTDIR=")+tempInstallDirectory
                                );
           cmCPackLogger(cmCPackLog::LOG_DEBUG,
                         "- Creating directory: '" << dir << "'" << std::endl);
@@ -926,7 +938,7 @@ int cmCPackGenerator::InstallProjectViaInstallCMakeProjects(
           }
 
         if (NULL !=mf->GetDefinition("CPACK_ABSOLUTE_DESTINATION_FILES")) {
-          if (absoluteDestFiles.length()>0) {
+          if (!absoluteDestFiles.empty()) {
             absoluteDestFiles +=";";
           }
           absoluteDestFiles +=
@@ -1356,7 +1368,7 @@ int cmCPackGenerator::PrepareGroupingKind()
      groupingType = this->GetOption("CPACK_COMPONENTS_GROUPING");
   }
 
-  if (groupingType.length()>0)
+  if (!groupingType.empty())
     {
     cmCPackLogger(cmCPackLog::LOG_VERBOSE,  "["
         << this->Name << "]"

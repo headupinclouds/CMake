@@ -334,7 +334,7 @@ int cmCPackPackageMakerGenerator::PackageFiles()
   if (this->Components.empty())
     {
     // Use PackageMaker to build the package.
-    cmOStringStream pkgCmd;
+    std::ostringstream pkgCmd;
     pkgCmd << "\"" << this->GetOption("CPACK_INSTALLER_PROGRAM")
            << "\" -build -p \"" << packageDirFileName << "\"";
     if (this->Components.empty())
@@ -368,7 +368,7 @@ int cmCPackPackageMakerGenerator::PackageFiles()
 
   std::string tmpFile = this->GetOption("CPACK_TOPLEVEL_DIRECTORY");
   tmpFile += "/hdiutilOutput.log";
-  cmOStringStream dmgCmd;
+  std::ostringstream dmgCmd;
   dmgCmd << "\"" << this->GetOption("CPACK_INSTALLER_PROGRAM_DISK_IMAGE")
     << "\" create -ov -format UDZO -srcfolder \"" << packageDirFileName
     << "\" \"" << packageFileNames[0] << "\"";
@@ -703,7 +703,7 @@ cmCPackPackageMakerGenerator::GetPackageName(const cmCPackComponent& component)
     {
     std::string packagesDir = this->GetOption("CPACK_TEMPORARY_DIRECTORY");
     packagesDir += ".dummy";
-    cmOStringStream out;
+    std::ostringstream out;
     out << cmSystemTools::GetFilenameWithoutLastExtension(packagesDir)
         << "-" << component.Name << ".pkg";
     return out.str();
@@ -726,7 +726,7 @@ GenerateComponentPackage(const char *packageFile,
                 packageFile << std::endl);
 
   // The command that will be used to run PackageMaker
-  cmOStringStream pkgCmd;
+  std::ostringstream pkgCmd;
 
   if (this->PackageCompatibilityVersion < getVersion(10, 5) ||
       this->PackageMakerVersion < 3.0)
@@ -816,7 +816,7 @@ WriteDistributionFile(const char* metapackageFile)
 
   // Create the choice outline, which provides a tree-based view of
   // the components in their groups.
-  cmOStringStream choiceOut;
+  std::ostringstream choiceOut;
   choiceOut << "<choices-outline>" << std::endl;
 
   // Emit the outline for the groups
@@ -878,7 +878,8 @@ WriteDistributionFile(const char* metapackageFile)
 //----------------------------------------------------------------------
 void
 cmCPackPackageMakerGenerator::
-CreateChoiceOutline(const cmCPackComponentGroup& group, cmOStringStream& out)
+CreateChoiceOutline(const cmCPackComponentGroup& group,
+                    std::ostringstream& out)
 {
   out << "<line choice=\"" << group.Name << "Choice\">" << std::endl;
   std::vector<cmCPackComponentGroup*>::const_iterator groupIt;
@@ -901,7 +902,7 @@ CreateChoiceOutline(const cmCPackComponentGroup& group, cmOStringStream& out)
 //----------------------------------------------------------------------
 void
 cmCPackPackageMakerGenerator::CreateChoice(const cmCPackComponentGroup& group,
-                                           cmOStringStream& out)
+                                           std::ostringstream& out)
 {
   out << "<choice id=\"" << group.Name << "Choice\" "
       << "title=\"" << group.DisplayName << "\" "
@@ -919,7 +920,7 @@ cmCPackPackageMakerGenerator::CreateChoice(const cmCPackComponentGroup& group,
 //----------------------------------------------------------------------
 void
 cmCPackPackageMakerGenerator::CreateChoice(const cmCPackComponent& component,
-                                           cmOStringStream& out)
+                                           std::ostringstream& out)
 {
   std::string packageId = "com.";
   packageId += this->GetOption("CPACK_PACKAGE_VENDOR");
@@ -980,6 +981,7 @@ cmCPackPackageMakerGenerator::CreateChoice(const cmCPackComponent& component,
   std::string dirName = this->GetOption("CPACK_TEMPORARY_DIRECTORY");
   dirName += '/';
   dirName += component.Name;
+  dirName += this->GetOption("CPACK_PACKAGING_INSTALL_PREFIX");
   unsigned long installedSize
     = component.GetInstalledSizeInKbytes(dirName.c_str());
 
@@ -1004,7 +1006,7 @@ void
 cmCPackPackageMakerGenerator::
 AddDependencyAttributes(const cmCPackComponent& component,
                         std::set<const cmCPackComponent *>& visited,
-                        cmOStringStream& out)
+                        std::ostringstream& out)
 {
   if (visited.find(&component) != visited.end())
     {
@@ -1028,7 +1030,7 @@ void
 cmCPackPackageMakerGenerator::
 AddReverseDependencyAttributes(const cmCPackComponent& component,
                                std::set<const cmCPackComponent *>& visited,
-                               cmOStringStream& out)
+                               std::ostringstream& out)
 {
   if (visited.find(&component) != visited.end())
     {

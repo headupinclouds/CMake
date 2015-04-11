@@ -19,7 +19,6 @@
 #include "CTest/cmCTestScriptHandler.h"
 #include "CTest/cmCTestLaunch.h"
 #include "cmsys/Encoding.hxx"
-#include <locale.h>
 
 //----------------------------------------------------------------------------
 static const char * cmDocumentationName[][2] =
@@ -117,8 +116,6 @@ static const char * cmDocumentationOptions[][2] =
 // this is a test driver program for cmCTest.
 int main (int argc, char const* const* argv)
 {
-  setlocale(LC_CTYPE, "");
-
   cmsys::Encoding::CommandLineArguments encoding_args =
     cmsys::Encoding::CommandLineArguments::Main(argc, argv);
   argc = encoding_args.argc();
@@ -136,7 +133,7 @@ int main (int argc, char const* const* argv)
 
   cmCTest inst;
 
-  if ( cmSystemTools::GetCurrentWorkingDirectory().size() == 0 )
+  if (cmSystemTools::GetCurrentWorkingDirectory().empty())
     {
     cmCTestLog(&inst, ERROR_MESSAGE,
       "Current working directory cannot be established." << std::endl);

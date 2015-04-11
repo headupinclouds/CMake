@@ -31,7 +31,7 @@ void reportBadObjLib(std::vector<cmSourceFile*> const& badObjLib,
 {
   if(!badObjLib.empty())
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "OBJECT library \"" << target->GetName() << "\" contains:\n";
     for(std::vector<cmSourceFile*>::const_iterator i = badObjLib.begin();
         i != badObjLib.end(); ++i)
@@ -56,7 +56,6 @@ struct ModuleDefinitionFileTag {};
 struct AppManifestTag{};
 struct CertificatesTag{};
 
-#if !defined(_MSC_VER) || _MSC_VER >= 1310
 template<typename Tag, typename OtherTag>
 struct IsSameTag
 {
@@ -72,25 +71,6 @@ struct IsSameTag<Tag, Tag>
     Result = true
   };
 };
-#else
-struct IsSameTagBase
-{
-  typedef char (&no_type)[1];
-  typedef char (&yes_type)[2];
-  template<typename T> struct Check;
-  template<typename T> static yes_type check(Check<T>*, Check<T>*);
-  static no_type check(...);
-};
-template<typename Tag1, typename Tag2>
-struct IsSameTag: public IsSameTagBase
-{
-  enum {
-    Result = (sizeof(check(static_cast< Check<Tag1>* >(0),
-                           static_cast< Check<Tag2>* >(0))) ==
-              sizeof(yes_type))
-  };
-};
-#endif
 
 template<bool>
 struct DoAccept
@@ -509,11 +489,7 @@ bool cmGeneratorTarget::IsSystemIncludeDirectory(const std::string& dir,
       unique.insert(*li);
       }
     result.clear();
-    for(std::set<std::string>::iterator li = unique.begin();
-        li != unique.end(); ++li)
-      {
-      result.push_back(*li);
-      }
+    result.insert(result.end(), unique.begin(), unique.end());
 
     IncludeCacheType::value_type entry(config_upper, result);
     iter = this->SystemIncludesCache.insert(entry).first;
@@ -646,6 +622,17 @@ cmTargetTraceDependencies
           si != sources.end(); ++si)
         {
         cmSourceFile* sf = *si;
+        const std::set<cmTarget const*> tgts =
+                          this->GlobalGenerator->GetFilenameTargetDepends(sf);
+        if (tgts.find(this->Target) != tgts.end())
+          {
+          std::ostringstream e;
+          e << "Evaluation output file\n  \"" << sf->GetFullPath()
+            << "\"\ndepends on the sources of a target it is used in.  This "
+              "is a dependency loop and is not allowed.";
+          this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
+          return;
+          }
         if(emitted.insert(sf).second && this->SourcesQueued.insert(sf).second)
           {
           this->SourceQueue.push(sf);
@@ -676,6 +663,14 @@ void cmTargetTraceDependencies::Trace()
       {
       std::vector<std::string> objDeps;
       cmSystemTools::ExpandListArgument(additionalDeps, objDeps);
+      for(std::vector<std::string>::iterator odi = objDeps.begin();
+          odi != objDeps.end(); ++odi)
+        {
+        if (cmSystemTools::FileIsFullPath(*odi))
+          {
+          *odi = cmSystemTools::CollapseFullPath(*odi);
+          }
+        }
       this->FollowNames(objDeps);
       }
 
@@ -831,11 +826,7 @@ cmTargetTraceDependencies
                                                               = ge.Parse(*cli);
       cge->Evaluate(this->Makefile, "", true);
       std::set<cmTarget*> geTargets = cge->GetTargets();
-      for(std::set<cmTarget*>::const_iterator it = geTargets.begin();
-          it != geTargets.end(); ++it)
-        {
-        targets.insert(*it);
-        }
+      targets.insert(geTargets.begin(), geTargets.end());
       }
     }
 

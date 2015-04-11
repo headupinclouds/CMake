@@ -15,7 +15,7 @@
 #include <errno.h> // errno
 #include <stdio.h> // SEEK_SET
 #include <fcntl.h>
-#include <unistd.h> // sleep
+#include "cmSystemTools.h"
 
 cmFileLock::cmFileLock(): File(-1)
 {
@@ -66,13 +66,13 @@ cmFileLockResult cmFileLock::LockWithoutTimeout()
     }
 }
 
-cmFileLockResult cmFileLock::LockWithTimeout(unsigned seconds)
+cmFileLockResult cmFileLock::LockWithTimeout(unsigned long seconds)
 {
   while (true)
     {
     if (this->LockFile(F_SETLK, F_WRLCK) == -1)
       {
-      if (errno != EAGAIN)
+      if (errno != EACCES && errno != EAGAIN)
         {
         return cmFileLockResult::MakeSystem();
         }
@@ -86,7 +86,7 @@ cmFileLockResult cmFileLock::LockWithTimeout(unsigned seconds)
       return cmFileLockResult::MakeTimeout();
       }
     --seconds;
-    ::sleep(1);
+    cmSystemTools::Delay(1000);
     }
 }
 
@@ -96,7 +96,7 @@ int cmFileLock::LockFile(int cmd, int type)
   lock.l_start = 0;
   lock.l_len = 0; // lock all bytes
   lock.l_pid = 0; // unused (for F_GETLK only)
-  lock.l_type = type; // exclusive lock
+  lock.l_type = static_cast<short>(type); // exclusive lock
   lock.l_whence = SEEK_SET;
   return ::fcntl(this->File, cmd, &lock);
 }

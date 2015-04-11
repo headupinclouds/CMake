@@ -47,7 +47,7 @@ void cmInstallTargetGenerator::GenerateScript(std::ostream& os)
   // Warn if installing an exclude-from-all target.
   if(this->Target->GetPropertyAsBool("EXCLUDE_FROM_ALL"))
     {
-    cmOStringStream msg;
+    std::ostringstream msg;
     msg << "WARNING: Target \"" << this->Target->GetName()
         << "\" has EXCLUDE_FROM_ALL set and will not be built by default "
         << "but an install rule has been provided for it.  CMake does "
@@ -101,7 +101,7 @@ void cmInstallTargetGenerator::GenerateScriptForConfig(std::ostream& os,
     case cmTarget::INTERFACE_LIBRARY:
       // Not reachable. We never create a cmInstallTargetGenerator for
       // an INTERFACE_LIBRARY.
-      assert(!"INTERFACE_LIBRARY targets have no installable outputs.");
+      assert(0 && "INTERFACE_LIBRARY targets have no installable outputs.");
       break;
     case cmTarget::OBJECT_LIBRARY:
     case cmTarget::UTILITY:
@@ -430,7 +430,7 @@ cmInstallTargetGenerator
 ::AddTweak(std::ostream& os, Indent const& indent, const std::string& config,
            std::string const& file, TweakMethod tweak)
 {
-  cmOStringStream tw;
+  std::ostringstream tw;
   (this->*tweak)(tw, indent.Next(), config, file);
   std::string tws = tw.str();
   if(!tws.empty())
@@ -456,7 +456,7 @@ cmInstallTargetGenerator
   else
     {
     // Generate a foreach loop to tweak multiple files.
-    cmOStringStream tw;
+    std::ostringstream tw;
     this->AddTweak(tw, indent.Next(), config, "${file}", tweak);
     std::string tws = tw.str();
     if(!tws.empty())
@@ -529,7 +529,7 @@ cmInstallTargetGenerator
   std::string installNameTool =
     this->Target->GetMakefile()->GetSafeDefinition("CMAKE_INSTALL_NAME_TOOL");
 
-  if(!installNameTool.size())
+  if(installNameTool.empty())
     {
     return;
     }
@@ -705,7 +705,7 @@ cmInstallTargetGenerator
        (!oldRuntimeDirs.empty() || !newRuntimeDirs.empty())
       )
       {
-      cmOStringStream msg;
+      std::ostringstream msg;
       msg << "WARNING: Target \"" << this->Target->GetName()
         << "\" has runtime paths which cannot be changed during install.  "
         << "To change runtime paths, OS X version 10.6 or newer is required.  "

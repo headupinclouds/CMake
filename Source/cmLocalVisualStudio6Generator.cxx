@@ -821,10 +821,12 @@ cmLocalVisualStudio6Generator::MaybeCreateOutputDir(cmTarget& target,
   command.push_back("make_directory");
   command.push_back(outDir);
   std::vector<std::string> no_output;
+  std::vector<std::string> no_byproducts;
   std::vector<std::string> no_depends;
   cmCustomCommandLines commands;
   commands.push_back(command);
-  pcc.reset(new cmCustomCommand(0, no_output, no_depends, commands, 0, 0));
+  pcc.reset(new cmCustomCommand(0, no_output, no_byproducts,
+                                no_depends, commands, 0, 0));
   pcc->SetEscapeOldStyle(false);
   pcc->SetEscapeAllowMakeVars(true);
   return pcc;
@@ -1319,7 +1321,7 @@ void cmLocalVisualStudio6Generator
     int major;
     int minor;
     target.GetTargetVersion(major, minor);
-    cmOStringStream targetVersionStream;
+    std::ostringstream targetVersionStream;
     targetVersionStream << "/version:" << major << "." << minor;
     targetVersionFlag = targetVersionStream.str();
     }
@@ -1996,7 +1998,7 @@ cmLocalVisualStudio6Generator
   if(define.find_first_of(" ") != define.npos &&
      define.find_first_of("\"$;") != define.npos)
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "WARNING: The VS6 IDE does not support preprocessor definition "
       << "values with spaces and '\"', '$', or ';'.\n"
       << "CMake is dropping a preprocessor definition: " << define << "\n"

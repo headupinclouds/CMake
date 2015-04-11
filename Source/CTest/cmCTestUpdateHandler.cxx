@@ -94,11 +94,11 @@ cmCTestUpdateHandlerLocale::~cmCTestUpdateHandlerLocale()
 {
   // restore the value of LC_MESSAGES after running the version control
   // commands
-  if(saveLCMessages.size())
+  if(!saveLCMessages.empty())
     {
     std::string put = "LC_MESSAGES=";
     put += saveLCMessages;
-    cmSystemTools::PutEnv(put.c_str());
+    cmSystemTools::PutEnv(put);
     }
   else
     {
@@ -413,7 +413,7 @@ bool cmCTestUpdateHandler::SelectVCS()
       }
     if (this->UpdateCommand.empty())
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Cannot find UpdateCommand ";
       if (key)
         {

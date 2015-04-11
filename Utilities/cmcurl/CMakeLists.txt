@@ -425,9 +425,6 @@ endif()
 
 #-----------------------------------------------------------------------------
 
-option(CMAKE_USE_OPENSSL "Use OpenSSL code. Experimental" OFF)
-mark_as_advanced(CMAKE_USE_OPENSSL)
-
 set(USE_SSLEAY OFF)
 set(USE_OPENSSL OFF)
 set(HAVE_LIBCRYPTO OFF)
@@ -443,24 +440,49 @@ if(CMAKE_USE_OPENSSL)
     set(HAVE_LIBSSL ON)
     include_directories(${OPENSSL_INCLUDE_DIR})
     set(CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
-    check_include_file_concat("openssl/crypto.h" HAVE_OPENSSL_CRYPTO_H)
-    check_include_file_concat("openssl/engine.h" HAVE_OPENSSL_ENGINE_H)
-    check_include_file_concat("openssl/err.h"    HAVE_OPENSSL_ERR_H)
-    check_include_file_concat("openssl/pem.h"    HAVE_OPENSSL_PEM_H)
-    check_include_file_concat("openssl/pkcs12.h" HAVE_OPENSSL_PKCS12_H)
-    check_include_file_concat("openssl/rsa.h"    HAVE_OPENSSL_RSA_H)
-    check_include_file_concat("openssl/ssl.h"    HAVE_OPENSSL_SSL_H)
-    check_include_file_concat("openssl/x509.h"   HAVE_OPENSSL_X509_H)
-    check_include_file_concat("openssl/rand.h"   HAVE_OPENSSL_RAND_H)
+    check_include_file("openssl/crypto.h" HAVE_OPENSSL_CRYPTO_H)
+    check_include_file("openssl/engine.h" HAVE_OPENSSL_ENGINE_H)
+    check_include_file("openssl/err.h"    HAVE_OPENSSL_ERR_H)
+    check_include_file("openssl/pem.h"    HAVE_OPENSSL_PEM_H)
+    check_include_file("openssl/pkcs12.h" HAVE_OPENSSL_PKCS12_H)
+    check_include_file("openssl/rsa.h"    HAVE_OPENSSL_RSA_H)
+    check_include_file("openssl/ssl.h"    HAVE_OPENSSL_SSL_H)
+    check_include_file("openssl/x509.h"   HAVE_OPENSSL_X509_H)
+    check_include_file("openssl/rand.h"   HAVE_OPENSSL_RAND_H)
 
     # Optionally build with a specific CA cert bundle.
-    set(CURL_CA_BUNDLE "" CACHE FILEPATH "Path to SSL CA Certificate Bundle")
-    mark_as_advanced(CURL_CA_BUNDLE)
     if(CURL_CA_BUNDLE)
       add_definitions(-DCURL_CA_BUNDLE="${CURL_CA_BUNDLE}")
     endif()
+    # Optionally build with a specific CA cert dir.
+    if(CURL_CA_PATH)
+      add_definitions(-DCURL_CA_PATH="${CURL_CA_PATH}")
+    endif()
   endif(OPENSSL_FOUND)
-endif(CMAKE_USE_OPENSSL)
+elseif(WIN32)
+  # Use Windows SSL/TLS native implementation.
+  add_definitions(-DUSE_SCHANNEL)
+  set(USE_WINDOWS_SSPI 1)
+elseif(APPLE)
+  # Use OS X SSL/TLS native implementation if available on target version.
+  if(CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(OSX_VERSION ${CMAKE_OSX_DEPLOYMENT_TARGET})
+  else()
+    execute_process(
+      COMMAND sw_vers -productVersion
+      OUTPUT_VARIABLE OSX_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
+  endif()
+  if(NOT OSX_VERSION VERSION_LESS 10.6 AND
+     CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    add_definitions(-DUSE_DARWINSSL)
+    list(APPEND CURL_LIBS
+      "-framework CoreFoundation"
+      "-framework Security"
+      )
+  endif()
+endif()
 
 #libSSH2
 option(CMAKE_USE_LIBSSH2 "Use libSSH2" ON)

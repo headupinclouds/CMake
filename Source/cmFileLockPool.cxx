@@ -23,16 +23,8 @@ cmFileLockPool::cmFileLockPool()
 
 cmFileLockPool::~cmFileLockPool()
 {
-  for (It i = this->FunctionScopes.begin();
-      i != this->FunctionScopes.end(); ++i)
-    {
-    delete *i;
-    }
-
-  for (It i = this->FileScopes.begin(); i != this->FileScopes.end(); ++i)
-    {
-    delete *i;
-    }
+  cmDeleteAll(this->FunctionScopes);
+  cmDeleteAll(this->FileScopes);
 }
 
 void cmFileLockPool::PushFunctionScope()
@@ -60,7 +52,7 @@ void cmFileLockPool::PopFileScope()
 }
 
 cmFileLockResult cmFileLockPool::LockFunctionScope(
-    const std::string& filename, unsigned timeoutSec)
+    const std::string& filename, unsigned long timeoutSec)
 {
   if (this->IsAlreadyLocked(filename))
     {
@@ -74,7 +66,7 @@ cmFileLockResult cmFileLockPool::LockFunctionScope(
 }
 
 cmFileLockResult cmFileLockPool::LockFileScope(
-    const std::string& filename, unsigned timeoutSec)
+    const std::string& filename, unsigned long timeoutSec)
 {
   if (this->IsAlreadyLocked(filename))
     {
@@ -85,7 +77,7 @@ cmFileLockResult cmFileLockPool::LockFileScope(
 }
 
 cmFileLockResult cmFileLockPool::LockProcessScope(
-    const std::string& filename, unsigned timeoutSec)
+    const std::string& filename, unsigned long timeoutSec)
 {
   if (this->IsAlreadyLocked(filename))
     {
@@ -148,14 +140,11 @@ cmFileLockPool::ScopePool::ScopePool()
 
 cmFileLockPool::ScopePool::~ScopePool()
 {
-  for (It i = this->Locks.begin(); i != this->Locks.end(); ++i)
-    {
-    delete *i;
-    }
+  cmDeleteAll(this->Locks);
 }
 
 cmFileLockResult cmFileLockPool::ScopePool::Lock(
-    const std::string& filename, unsigned timeoutSec)
+    const std::string& filename, unsigned long timeoutSec)
 {
   cmFileLock *lock = new cmFileLock();
   const cmFileLockResult result = lock->Lock(filename, timeoutSec);

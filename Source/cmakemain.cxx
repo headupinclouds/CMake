@@ -25,7 +25,6 @@
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include <cmsys/Encoding.hxx>
-#include <locale.h>
 
 #ifdef CMAKE_BUILD_WITH_CMAKE
 //----------------------------------------------------------------------------
@@ -96,11 +95,9 @@ static const char * cmDocumentationOptions[][2] =
 static int do_command(int ac, char const* const* av)
 {
   std::vector<std::string> args;
+  args.reserve(ac - 1);
   args.push_back(av[0]);
-  for(int i = 2; i < ac; ++i)
-    {
-    args.push_back(av[i]);
-    }
+  args.insert(args.end(), av + 2, av + ac);
   return cmcmd::ExecuteCMakeCommand(args);
 }
 
@@ -175,7 +172,6 @@ static void cmakemainProgressCallback(const char *m, float prog,
 
 int main(int ac, char const* const* av)
 {
-  setlocale(LC_CTYPE, "");
   cmsys::Encoding::CommandLineArguments args =
     cmsys::Encoding::CommandLineArguments::Main(ac, av);
   ac = args.argc();
@@ -203,7 +199,7 @@ int main(int ac, char const* const* av)
 
 int do_cmake(int ac, char const* const* av)
 {
-  if ( cmSystemTools::GetCurrentWorkingDirectory().size() == 0 )
+  if (cmSystemTools::GetCurrentWorkingDirectory().empty())
     {
     std::cerr << "Current working directory cannot be established."
               << std::endl;
@@ -221,11 +217,7 @@ int do_cmake(int ac, char const* const* av)
 
     // the command line args are processed here so that you can do
     // -DCMAKE_MODULE_PATH=/some/path and have this value accessible here
-    std::vector<std::string> args;
-    for(int i =0; i < ac; ++i)
-      {
-      args.push_back(av[i]);
-      }
+    std::vector<std::string> args(av, av + ac);
     hcm.SetCacheArgs(args);
 
     std::vector<cmDocumentationEntry> generators;

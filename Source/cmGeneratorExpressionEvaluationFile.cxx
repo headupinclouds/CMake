@@ -13,6 +13,9 @@
 #include "cmGeneratorExpressionEvaluationFile.h"
 
 #include "cmMakefile.h"
+#include "cmLocalGenerator.h"
+#include "cmGlobalGenerator.h"
+#include "cmSourceFile.h"
 #include "cmGeneratedFileStream.h"
 #include <cmsys/FStream.hxx>
 
@@ -48,7 +51,7 @@ void cmGeneratorExpressionEvaluationFile::Generate(const std::string& config,
       }
     if (condResult != "1")
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Evaluation file condition \"" << rawCondition << "\" did "
           "not evaluate to valid content. Got \"" << condResult << "\".";
       this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
@@ -70,13 +73,14 @@ void cmGeneratorExpressionEvaluationFile::Generate(const std::string& config,
       {
       return;
       }
-    cmOStringStream e;
+    std::ostringstream e;
     e << "Evaluation file to be written multiple times for different "
          "configurations with different content:\n  " << outputFileName;
     this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
     return;
     }
 
+  this->Makefile->AddCMakeOutputFile(outputFileName.c_str());
   this->Files.push_back(outputFileName);
   outputFiles[outputFileName] = outputContent;
 
@@ -90,6 +94,20 @@ void cmGeneratorExpressionEvaluationFile::Generate(const std::string& config,
 }
 
 //----------------------------------------------------------------------------
+void cmGeneratorExpressionEvaluationFile::CreateOutputFile(
+                                              std::string const& config)
+{
+  std::string name = this->OutputFileExpr->Evaluate(this->Makefile, config);
+  cmSourceFile* sf = this->Makefile->GetOrCreateSource(name);
+  sf->SetProperty("GENERATED", "1");
+
+  cmGlobalGenerator *gg
+                  = this->Makefile->GetLocalGenerator()->GetGlobalGenerator();
+  gg->SetFilenameTargetDepends(sf,
+                          this->OutputFileExpr->GetSourceSensitiveTargets());
+}
+
+//----------------------------------------------------------------------------
 void cmGeneratorExpressionEvaluationFile::Generate()
 {
   mode_t perm = 0;
@@ -100,11 +118,12 @@ void cmGeneratorExpressionEvaluationFile::Generate()
     }
   else
     {
+    this->Makefile->AddCMakeDependFile(this->Input.c_str());
     cmSystemTools::GetPermissions(this->Input.c_str(), perm);
     cmsys::ifstream fin(this->Input.c_str());
     if(!fin)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << "Evaluation file \"" << this->Input << "\" cannot be read.";
       this->Makefile->IssueMessage(cmake::FATAL_ERROR, e.str());
       return;

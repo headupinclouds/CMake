@@ -11,7 +11,6 @@
 ============================================================================*/
 
 #include "cmConditionEvaluator.h"
-#include "cmStringCommand.h"
 
 cmConditionEvaluator::cmConditionEvaluator(cmMakefile& makefile):
   Makefile(makefile),
@@ -54,10 +53,7 @@ bool cmConditionEvaluator::IsTrue(
   cmArgumentList newArgs;
 
   // copy to the list structure
-  for(unsigned int i = 0; i < args.size(); ++i)
-    {
-    newArgs.push_back(args[i]);
-    }
+  newArgs.insert(newArgs.end(), args.begin(), args.end());
 
   // now loop through the arguments and see if we can reduce any of them
   // we do this multiple times. Once for each level of precedence
@@ -120,7 +116,7 @@ const char* cmConditionEvaluator::GetDefinitionIfUnquoted(
 
     if(!hasBeenReported)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << (this->Makefile.GetPolicies()->GetPolicyWarning(
         cmPolicies::CMP0054)) << "\n";
       e << "Quoted variables like \"" << argument.GetValue() <<
@@ -170,7 +166,7 @@ bool cmConditionEvaluator::IsKeyword(std::string const& keyword,
 
     if(!hasBeenReported)
       {
-      cmOStringStream e;
+      std::ostringstream e;
       e << (this->Makefile.GetPolicies()->GetPolicyWarning(
         cmPolicies::CMP0054)) << "\n";
       e << "Quoted keywords like \"" << argument.GetValue() <<
@@ -412,10 +408,7 @@ bool cmConditionEvaluator::HandleLevel0(cmArgumentList &newArgs,
         // copy to the list structure
         cmArgumentList::iterator argP1 = arg;
         argP1++;
-        for(; argP1 != argClose; argP1++)
-          {
-          newArgs2.push_back(*argP1);
-          }
+        newArgs2.insert(newArgs2.end(), argP1, argClose);
         newArgs2.pop_back();
         // now recursively invoke IsTrue to handle the values inside the
         // parenthetical expression
@@ -556,11 +549,11 @@ bool cmConditionEvaluator::HandleLevel2(cmArgumentList &newArgs,
         {
         def = this->GetVariableOrString(*arg);
         const char* rex = argP2->c_str();
-        cmStringCommand::ClearMatches(&this->Makefile);
+        this->Makefile.ClearMatches();
         cmsys::RegularExpression regEntry;
         if ( !regEntry.compile(rex) )
           {
-          cmOStringStream error;
+          std::ostringstream error;
           error << "Regular expression \"" << rex << "\" cannot compile";
           errorString = error.str();
           status = cmake::FATAL_ERROR;
@@ -568,7 +561,7 @@ bool cmConditionEvaluator::HandleLevel2(cmArgumentList &newArgs,
           }
         if (regEntry.find(def))
           {
-          cmStringCommand::StoreMatches(&this->Makefile, regEntry);
+          this->Makefile.StoreMatches(regEntry);
           *arg = cmExpandedCommandArgument("1", true);
           }
         else

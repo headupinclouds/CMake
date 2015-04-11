@@ -307,7 +307,7 @@ void cmVisualStudio10TargetGenerator::Generate()
   this->BuildFileStream->SetCopyIfDifferent(true);
 
   // Write the encoding header into the file
-  char magic[] = {0xEF,0xBB, 0xBF};
+  char magic[] = {char(0xEF), char(0xBB), char(0xBF)};
   this->BuildFileStream->write(magic, 3);
 
   //get the tools version to use
@@ -748,6 +748,12 @@ void cmVisualStudio10TargetGenerator
   ntv += toolset? toolset : "Default";
   ntv += "</NdkToolchainVersion>\n";
   this->WriteString(ntv.c_str(), 2);
+  if(const char* minApi = this->Target->GetProperty("ANDROID_API_MIN"))
+    {
+    this->WriteString("<AndroidMinAPI>", 2);
+    (*this->BuildFileStream ) <<
+      "android-" << cmVS10EscapeXML(minApi) << "</AndroidMinAPI>\n";
+    }
   if(const char* api = this->Target->GetProperty("ANDROID_API"))
     {
     this->WriteString("<AndroidTargetAPI>", 2);
@@ -937,7 +943,7 @@ void cmVisualStudio10TargetGenerator::WriteGroups()
   path += ".vcxproj.filters";
   cmGeneratedFileStream fout(path.c_str());
   fout.SetCopyIfDifferent(true);
-  char magic[] = {0xEF,0xBB, 0xBF};
+  char magic[] = {char(0xEF), char(0xBB), char(0xBF)};
   fout.write(magic, 3);
   cmGeneratedFileStream* save = this->BuildFileStream;
   this->BuildFileStream = & fout;
@@ -1205,6 +1211,7 @@ void cmVisualStudio10TargetGenerator::WriteExtraSource(cmSourceFile const* sf)
   std::string shaderType;
   std::string shaderEntryPoint;
   std::string shaderModel;
+  std::string shaderAdditionalFlags;
   std::string ext = cmSystemTools::LowerCase(sf->GetExtension());
   if(ext == "hlsl")
     {
@@ -1221,10 +1228,16 @@ void cmVisualStudio10TargetGenerator::WriteExtraSource(cmSourceFile const* sf)
       shaderEntryPoint = se;
       toolHasSettings = true;
       }
-    // Figure out which entry point to use if any
+    // Figure out which shader model to use if any
     if (const char* sm = sf->GetProperty("VS_SHADER_MODEL"))
       {
       shaderModel = sm;
+      toolHasSettings = true;
+      }
+    // Figure out if there's any additional flags to use
+    if (const char* saf = sf->GetProperty("VS_SHADER_FLAGS"))
+      {
+      shaderAdditionalFlags = saf;
       toolHasSettings = true;
       }
     }
@@ -1335,6 +1348,12 @@ void cmVisualStudio10TargetGenerator::WriteExtraSource(cmSourceFile const* sf)
       this->WriteString("<ShaderModel>", 3);
       (*this->BuildFileStream) << cmVS10EscapeXML(shaderModel)
                                << "</ShaderModel>\n";
+      }
+    if(!shaderAdditionalFlags.empty())
+      {
+      this->WriteString("<AdditionalOptions>", 3);
+      (*this->BuildFileStream) << cmVS10EscapeXML(shaderAdditionalFlags)
+                               << "</AdditionalOptions>\n";
       }
     this->WriteString("</", 2);
     (*this->BuildFileStream) << tool << ">\n";
@@ -1636,6 +1655,11 @@ bool cmVisualStudio10TargetGenerator::OutputSourceSpecificFlags(
         {
         clOptions.AppendFlag("AdditionalIncludeDirectories",
                              "%(AdditionalIncludeDirectories)");
+        }
+      if(clOptions.HasFlag("DisableSpecificWarnings"))
+        {
+        clOptions.AppendFlag("DisableSpecificWarnings",
+                             "%(DisableSpecificWarnings)");
         }
       clOptions.AddDefines(configDefines.c_str());
       clOptions.SetConfiguration((*config).c_str());
@@ -2738,6 +2762,8 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings()
     this->WriteString("<ApplicationTypeRevision>", 2);
     (*this->BuildFileStream) << cmVS10EscapeXML(v)
                              << "</ApplicationTypeRevision>\n";
+    this->WriteString("<DefaultLanguage>en-US"
+                      "</DefaultLanguage>\n", 2);
     if(v == "8.1")
       {
       // Visual Studio 12.0 is necessary for building 8.1 apps
@@ -2772,12 +2798,12 @@ void cmVisualStudio10TargetGenerator::WriteApplicationTypeSettings()
   if(isAppContainer)
     {
     this->WriteString("<AppContainerApplication>true"
-                      "</AppContainerApplication>", 2);
+                      "</AppContainerApplication>\n", 2);
     }
   else if (this->Platform == "ARM")
     {
     this->WriteString("<WindowsSDKDesktopARMSupport>true"
-                      "</WindowsSDKDesktopARMSupport>", 2);
+                      "</WindowsSDKDesktopARMSupport>\n", 2);
     }
 }
 

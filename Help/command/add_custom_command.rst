@@ -15,10 +15,12 @@ The first signature is for adding a custom command to produce an output::
                      [COMMAND command2 [ARGS] [args2...] ...]
                      [MAIN_DEPENDENCY depend]
                      [DEPENDS [depends...]]
+                     [BYPRODUCTS [files...]]
                      [IMPLICIT_DEPENDS <lang1> depend1
                                       [<lang2> depend2] ...]
                      [WORKING_DIRECTORY dir]
-                     [COMMENT comment] [VERBATIM] [APPEND])
+                     [COMMENT comment]
+                     [VERBATIM] [APPEND] [USES_TERMINAL])
 
 This defines a command to generate specified ``OUTPUT`` file(s).
 A target created in the same directory (``CMakeLists.txt`` file)
@@ -42,6 +44,27 @@ The options are:
   The ``COMMENT``, ``MAIN_DEPENDENCY``, and ``WORKING_DIRECTORY``
   options are currently ignored when APPEND is given, but may be
   used in the future.
+
+``BYPRODUCTS``
+  Specify the files the command is expected to produce but whose
+  modification time may or may not be newer than the dependencies.
+  If a byproduct name is a relative path it will be interpreted
+  relative to the build tree directory corresponding to the
+  current source directory.
+  Each byproduct file will be marked with the :prop_sf:`GENERATED`
+  source file property automatically.
+
+  Explicit specification of byproducts is supported by the
+  :generator:`Ninja` generator to tell the ``ninja`` build tool
+  how to regenerate byproducts when they are missing.  It is
+  also useful when other build rules (e.g. custom commands)
+  depend on the byproducts.  Ninja requires a build rule for any
+  generated file on which another rule depends even if there are
+  order-only dependencies to ensure the byproducts will be
+  available before their dependents build.
+
+  The ``BYPRODUCTS`` option is ignored on non-Ninja generators
+  except to mark byproducts ``GENERATED``.
 
 ``COMMAND``
   Specify the command-line(s) to execute at build time.
@@ -107,16 +130,24 @@ The options are:
   Specify the primary input source file to the command.  This is
   treated just like any value given to the ``DEPENDS`` option
   but also suggests to Visual Studio generators where to hang
-  the custom command.
+  the custom command.  At most one custom command may specify a
+  given source file as its main dependency.
 
 ``OUTPUT``
   Specify the output files the command is expected to produce.
   If an output name is a relative path it will be interpreted
   relative to the build tree directory corresponding to the
   current source directory.
+  Each output file will be marked with the :prop_sf:`GENERATED`
+  source file property automatically.
   If the output of the custom command is not actually created
   as a file on disk it should be marked with the :prop_sf:`SYMBOLIC`
   source file property.
+
+``USES_TERMINAL``
+  The command will be given direct access to the terminal if possible.
+  With the :generator:`Ninja` generator, this places the command in
+  the ``console`` :prop_gbl:`pool <JOB_POOLS>`.
 
 ``VERBATIM``
   All arguments to the commands will be escaped properly for the
@@ -148,8 +179,10 @@ target is already built, the command will not execute.
                      PRE_BUILD | PRE_LINK | POST_BUILD
                      COMMAND command1 [ARGS] [args1...]
                      [COMMAND command2 [ARGS] [args2...] ...]
+                     [BYPRODUCTS [files...]]
                      [WORKING_DIRECTORY dir]
-                     [COMMENT comment] [VERBATIM])
+                     [COMMENT comment]
+                     [VERBATIM] [USES_TERMINAL])
 
 This defines a new command that will be associated with building the
 specified target.  When the command will happen is determined by which

@@ -34,7 +34,7 @@ bool cmConfigureFileCommand
   // If the input location is a directory, error out.
   if(cmSystemTools::FileIsDirectory(this->InputFile))
     {
-    cmOStringStream e;
+    std::ostringstream e;
     e << "input location\n"
       << "  " << this->InputFile << "\n"
       << "is a directory but a file was expected.";
@@ -99,6 +99,13 @@ bool cmConfigureFileCommand
     else if(args[i] == "IMMEDIATE")
       {
       /* Ignore legacy option.  */
+      }
+    else if(args[i] == "NEWLINE_STYLE" ||
+            args[i] == "LF" || args[i] == "UNIX" ||
+            args[i] == "CRLF" || args[i] == "WIN32" ||
+            args[i] == "DOS")
+      {
+      /* Options handled by NewLineStyle member above.  */
       }
     else
       {

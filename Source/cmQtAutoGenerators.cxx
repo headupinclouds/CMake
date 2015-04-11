@@ -178,7 +178,7 @@ std::string cmQtAutoGenerators::ListQt5RccInputs(cmSourceFile* sf,
   command.push_back("--list");
 
   std::string absFile = cmsys::SystemTools::GetRealPath(
-                                              sf->GetFullPath().c_str());
+                                              sf->GetFullPath());
 
   command.push_back(absFile);
 
@@ -224,16 +224,7 @@ std::string cmQtAutoGenerators::ListQt5RccInputs(cmSourceFile* sf,
       }
     }
   depends.insert(depends.end(), qrcEntries.begin(), qrcEntries.end());
-  std::string entriesList;
-  const char* sep = "";
-  for(std::vector<std::string>::const_iterator it = qrcEntries.begin();
-      it != qrcEntries.end(); ++it)
-    {
-    entriesList += sep;
-    entriesList += *it;
-    sep = "@list_sep@";
-    }
-  return entriesList;
+  return cmJoin(qrcEntries, "@list_sep@");
 }
 
 std::string cmQtAutoGenerators::ListQt4RccInputs(cmSourceFile* sf,
@@ -394,7 +385,7 @@ bool cmQtAutoGenerators::InitializeAutogenTarget(cmTarget* target)
       {
       cmSourceFile* sf = *fileIt;
       std::string absFile = cmsys::SystemTools::GetRealPath(
-                                                sf->GetFullPath().c_str());
+                                                sf->GetFullPath());
 
       std::string ext = sf->GetExtension();
 
@@ -438,7 +429,8 @@ bool cmQtAutoGenerators::InitializeAutogenTarget(cmTarget* target)
     // rejection in cmMakefile::AddCustomCommandToTarget because we know
     // PRE_BUILD will work for an OBJECT_LIBRARY in this specific case.
     std::vector<std::string> no_output;
-    cmCustomCommand cc(makefile, no_output, depends,
+    std::vector<std::string> no_byproducts;
+    cmCustomCommand cc(makefile, no_output, no_byproducts, depends,
                        commandLines, autogenComment.c_str(),
                        workingDirectory.c_str());
     cc.SetEscapeOldStyle(false);
@@ -451,7 +443,9 @@ bool cmQtAutoGenerators::InitializeAutogenTarget(cmTarget* target)
     cmTarget* autogenTarget = 0;
     if (!rcc_output.empty())
       {
-      makefile->AddCustomCommandToOutput(rcc_output, depends, "",
+      std::vector<std::string> no_byproducts;
+      makefile->AddCustomCommandToOutput(rcc_output, no_byproducts,
+                                         depends, "",
                                          commandLines, 0,
                                          workingDirectory.c_str(),
                                          false, false);
@@ -509,29 +503,13 @@ static void GetCompileDefinitionsAndDirectories(cmTarget const* target,
   // Get the include dirs for this target, without stripping the implicit
   // include dirs off, see http://public.kitware.com/Bug/view.php?id=13667
   localGen->GetIncludeDirectories(includeDirs, gtgt, "CXX", config, false);
-  const char* sep = "";
-  incs = "";
-  for(std::vector<std::string>::const_iterator incDirIt = includeDirs.begin();
-      incDirIt != includeDirs.end();
-      ++incDirIt)
-    {
-    incs += sep;
-    sep = ";";
-    incs += *incDirIt;
-    }
+
+  incs = cmJoin(includeDirs, ";");
 
   std::set<std::string> defines;
   localGen->AddCompileDefinitions(defines, target, config);
 
-  sep = "";
-  for(std::set<std::string>::const_iterator defIt = defines.begin();
-      defIt != defines.end();
-      ++defIt)
-    {
-    defs += sep;
-    sep = ";";
-    defs += *defIt;
-    }
+  defs += cmJoin(defines, ";");
 }
 
 void cmQtAutoGenerators::SetupAutoGenerateTarget(cmTarget const* target)
@@ -876,16 +854,7 @@ static void GetUicOpts(cmTarget const* target, const std::string& config,
 {
   std::vector<std::string> opts;
   target->GetAutoUicOptions(opts, config);
-
-  const char* sep = "";
-  for(std::vector<std::string>::const_iterator optIt = opts.begin();
-      optIt != opts.end();
-      ++optIt)
-    {
-    optString += sep;
-    sep = ";";
-    optString += *optIt;
-    }
+  optString = cmJoin(opts, ";");
 }
 
 void cmQtAutoGenerators::SetupAutoUicTarget(cmTarget const* target,
@@ -896,12 +865,7 @@ void cmQtAutoGenerators::SetupAutoUicTarget(cmTarget const* target,
   std::set<std::string> skipped;
   std::vector<std::string> skipVec;
   cmSystemTools::ExpandListArgument(this->SkipUic, skipVec);
-
-  for (std::vector<std::string>::const_iterator li = skipVec.begin();
-       li != skipVec.end(); ++li)
-    {
-    skipped.insert(*li);
-    }
+  skipped.insert(skipVec.begin(), skipVec.end());
 
   makefile->AddDefinition("_skip_uic",
           cmLocalGenerator::EscapeForCMake(this->SkipUic).c_str());
@@ -1479,7 +1443,7 @@ void cmQtAutoGenerators::Init()
     {
     const std::string &path = *it;
     this->MocIncludes.push_back("-I" + path);
-    if (this->EndsWith(path, ".framework/Headers"))
+    if (cmHasLiteralSuffix(path, ".framework/Headers"))
       {
       // Go up twice to get to the framework root
       std::vector<std::string> pathComponents;
@@ -1500,7 +1464,7 @@ void cmQtAutoGenerators::Init()
 
     if (this->IncludeProjectDirsBefore)
       {
-      const std::string &binDir = "-I" + this->ProjectBinaryDir;
+      const std::string binDir = "-I" + this->ProjectBinaryDir;
 
       const std::string srcDir = "-I" + this->ProjectSourceDir;
 
@@ -1619,12 +1583,7 @@ bool cmQtAutoGenerators::RunAutogen(cmMakefile* makefile)
 
   std::vector<std::string> headerFilesVec;
   cmSystemTools::ExpandListArgument(this->Headers, headerFilesVec);
-  for (std::vector<std::string>::const_iterator it = headerFilesVec.begin();
-       it != headerFilesVec.end();
-       ++it)
-    {
-    headerFiles.insert(*it);
-    }
+  headerFiles.insert(headerFilesVec.begin(), headerFilesVec.end());
 
   // key = moc source filepath, value = moc output filename
   std::map<std::string, std::string> notIncludedMocs;
@@ -1771,7 +1730,7 @@ void cmQtAutoGenerators::ParseCppFile(const std::string& absFilename,
 
       std::string basename = cmsys::SystemTools::
                                    GetFilenameWithoutLastExtension(currentMoc);
-      const bool moc_style = this->StartsWith(basename, "moc_");
+      const bool moc_style = cmHasLiteralPrefix(basename, "moc_");
 
       // If the moc include is of the moc_foo.cpp style we expect
       // the Q_OBJECT class declaration in a header file.
@@ -1953,7 +1912,7 @@ void cmQtAutoGenerators::StrictParseCppFile(const std::string& absFilename,
 
       std::string basename = cmsys::SystemTools::
                                    GetFilenameWithoutLastExtension(currentMoc);
-      const bool mocUnderscoreStyle = this->StartsWith(basename, "moc_");
+      const bool mocUnderscoreStyle = cmHasLiteralPrefix(basename, "moc_");
 
       // If the moc include is of the moc_foo.cpp style we expect
       // the Q_OBJECT class declaration in a header file.
@@ -2185,24 +2144,12 @@ bool cmQtAutoGenerators::GenerateMoc(const std::string& sourceFile,
 
     std::vector<std::string> command;
     command.push_back(this->MocExecutable);
-    for (std::list<std::string>::const_iterator it = this->MocIncludes.begin();
-         it != this->MocIncludes.end();
-         ++it)
-      {
-      command.push_back(*it);
-      }
-    for(std::list<std::string>::const_iterator it=this->MocDefinitions.begin();
-        it != this->MocDefinitions.end();
-        ++it)
-      {
-      command.push_back(*it);
-      }
-    for(std::vector<std::string>::const_iterator it=this->MocOptions.begin();
-        it != this->MocOptions.end();
-        ++it)
-      {
-      command.push_back(*it);
-      }
+    command.insert(command.end(),
+                   this->MocIncludes.begin(), this->MocIncludes.end());
+    command.insert(command.end(),
+                   this->MocDefinitions.begin(), this->MocDefinitions.end());
+    command.insert(command.end(),
+                   this->MocOptions.begin(), this->MocOptions.end());
 #ifdef _WIN32
     command.push_back("-DWIN32");
 #endif
@@ -2274,12 +2221,7 @@ bool cmQtAutoGenerators::GenerateUi(const std::string& realName,
       cmSystemTools::ExpandListArgument(optionIt->second, fileOpts);
       this->MergeUicOptions(opts, fileOpts, this->QtMajorVersion == "5");
       }
-    for(std::vector<std::string>::const_iterator optIt = opts.begin();
-        optIt != opts.end();
-        ++optIt)
-      {
-      command.push_back(*optIt);
-      }
+    command.insert(command.end(), opts.begin(), opts.end());
 
     command.push_back("-o");
     command.push_back(this->Builddir + ui_output_file);
@@ -2301,7 +2243,8 @@ bool cmQtAutoGenerators::GenerateUi(const std::string& realName,
     if (!result || retVal)
       {
       std::cerr << "AUTOUIC: error: process for " << ui_output_file <<
-                " failed:\n" << output << std::endl;
+                " needed by\n \"" << realName << "\"\nfailed:\n" << output
+                << std::endl;
       this->RunUicFailed = true;
       cmSystemTools::RemoveFile(ui_output_file);
       return false;
@@ -2319,8 +2262,8 @@ bool cmQtAutoGenerators::InputFilesNewerThanQrc(const std::string& qrcFile,
        it != files.end(); ++it)
     {
     int inputNewerThanQrc = 0;
-    bool success = cmsys::SystemTools::FileTimeCompare(it->c_str(),
-                                                      rccOutput.c_str(),
+    bool success = cmsys::SystemTools::FileTimeCompare(*it,
+                                                      rccOutput,
                                                       &inputNewerThanQrc);
     if (!success || inputNewerThanQrc >= 0)
       {
@@ -2353,7 +2296,7 @@ bool cmQtAutoGenerators::GenerateQrc()
 
     int sourceNewerThanQrc = 0;
     bool generateQrc = !cmsys::SystemTools::FileTimeCompare(*si,
-                                                      rcc_output_file.c_str(),
+                                                      rcc_output_file,
                                                       &sourceNewerThanQrc);
     generateQrc = generateQrc || (sourceNewerThanQrc >= 0);
     generateQrc = generateQrc || this->InputFilesNewerThanQrc(*si,
@@ -2365,14 +2308,7 @@ bool cmQtAutoGenerators::GenerateQrc()
               = this->RccOptions.find(*si);
       if (optionIt != this->RccOptions.end())
         {
-        std::vector<std::string> opts;
-        cmSystemTools::ExpandListArgument(optionIt->second, opts);
-        for(std::vector<std::string>::const_iterator optIt = opts.begin();
-            optIt != opts.end();
-            ++optIt)
-          {
-          command.push_back(*optIt);
-          }
+        cmSystemTools::ExpandListArgument(optionIt->second, command);
         }
 
       command.push_back("-name");

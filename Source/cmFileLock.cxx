@@ -22,12 +22,13 @@ cmFileLock::~cmFileLock()
   if (!this->Filename.empty())
     {
     const cmFileLockResult result = this->Release();
+    static_cast<void>(result);
     assert(result.IsOk());
     }
 }
 
 cmFileLockResult cmFileLock::Lock(
-    const std::string& filename, unsigned timeout)
+    const std::string& filename, unsigned long timeout)
 {
   if (filename.empty())
     {
@@ -47,7 +48,7 @@ cmFileLockResult cmFileLock::Lock(
   cmFileLockResult result = this->OpenFile();
   if (result.IsOk())
     {
-    if (timeout == static_cast<unsigned>(-1))
+    if (timeout == static_cast<unsigned long>(-1))
       {
       result = this->LockWithoutTimeout();
       }

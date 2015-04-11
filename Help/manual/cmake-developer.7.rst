@@ -21,133 +21,12 @@ CMake is required to build with ancient C++ compilers and standard library
 implementations.  Some common C++ constructs may not be used in CMake in order
 to build with such toolchains.
 
-std::vector::at
----------------
-
-The ``at()`` member function of ``std::vector`` may not be used. Use
-``operator[]`` instead:
-
-.. code-block:: c++
-
-  std::vector<int> someVec = getVec();
-  int i1 = someVec.at(5); // Wrong
-  int i2 = someVec[5];    // Ok
-
-std::string::append and std::string::clear
-------------------------------------------
-
-The ``append()`` and ``clear()`` member functions of ``std::string`` may not
-be used. Use ``operator+=`` and ``operator=`` instead:
-
-.. code-block:: c++
-
-  std::string stringBuilder;
-  stringBuilder.append("chunk"); // Wrong
-  stringBuilder.clear(); // Wrong
-  stringBuilder += "chunk";      // Ok
-  stringBuilder = "";      // Ok
-
-std::set const iterators
-------------------------
-
-The ``find()`` member function of a ``const`` ``std::set`` instance may not be
-used in a comparison with the iterator returned by ``end()``:
-
-.. code-block:: c++
-
-  const std::set<std::string>& someSet = getSet();
-  if (someSet.find("needle") == someSet.end()) // Wrong
-    {
-    // ...
-    }
-
-The return value of ``find()`` must be assigned to an intermediate
-``const_iterator`` for comparison:
-
-.. code-block:: c++
-
-  const std::set<std::string>& someSet;
-  const std::set<std::string>::const_iterator i = someSet.find("needle");
-  if (i != propSet.end()) // Ok
-    {
-    // ...
-    }
-
-Char Array to ``string`` Conversions with Algorithms
-----------------------------------------------------
-
-In some implementations, algorithms operating on iterators to a container of
-``std::string`` can not accept a ``const char*`` value:
-
-.. code-block:: c++
-
-  const char* dir = /*...*/;
-  std::vector<std::string> vec;
-  // ...
-  std::binary_search(vec.begin(), vec.end(), dir); // Wrong
-
-The ``std::string`` may need to be explicitly constructed:
-
-.. code-block:: c++
-
-  const char* dir = /*...*/;
-  std::vector<std::string> vec;
-  // ...
-  std::binary_search(vec.begin(), vec.end(), std::string(dir)); // Ok
-
 std::auto_ptr
 -------------
 
 Some implementations have a ``std::auto_ptr`` which can not be used as a
 return value from a function. ``std::auto_ptr`` may not be used. Use
 ``cmsys::auto_ptr`` instead.
-
-std::vector::insert and std::set
---------------------------------
-
-Use of ``std::vector::insert`` with an iterator whose ``element_type`` requires
-conversion is not allowed:
-
-.. code-block:: c++
-
-  std::set<const char*> theSet;
-  std::vector<std::string> theVector;
-  theVector.insert(theVector.end(), theSet.begin(), theSet.end()); // Wrong
-
-A loop must be used instead:
-
-.. code-block:: c++
-
-  std::set<const char*> theSet;
-  std::vector<std::string> theVector;
-  for(std::set<const char*>::iterator li = theSet.begin();
-      li != theSet.end(); ++li)
-    {
-    theVector.push_back(*li);
-    }
-
-std::set::insert
-----------------
-
-Use of ``std::set::insert`` is not allowed with any source container:
-
-.. code-block:: c++
-
-  std::set<cmTarget*> theSet;
-  theSet.insert(targets.begin(), targets.end()); // Wrong
-
-A loop must be used instead:
-
-.. code-block:: c++
-
-  ConstIterator it = targets.begin();
-  const ConstIterator end = targets.end();
-  for ( ; it != end; ++it)
-    {
-    theSet.insert(*it);
-    }
-
-.. MSVC6, SunCC 5.9
 
 Template Parameter Defaults
 ---------------------------
@@ -177,12 +56,6 @@ this does not work with other ancient compilers:
 
 and invoke it with the value ``0`` explicitly in all cases.
 
-std::min and std::max
----------------------
-
-``min`` and ``max`` are defined as macros on some systems. ``std::min`` and
-``std::max`` may not be used.  Use ``cmMinimum`` and ``cmMaximum`` instead.
-
 size_t
 ------
 
@@ -190,12 +63,6 @@ Various implementations have differing implementation of ``size_t``.  When
 assigning the result of ``.size()`` on a container for example, the result
 should be assigned to ``size_t`` not to ``std::size_t``, ``unsigned int`` or
 similar types.
-
-Templates
----------
-
-Some template code is permitted, but with some limitations. Member templates
-may not be used, and template friends may not be used.
 
 Adding Compile Features
 =======================
@@ -213,7 +80,9 @@ When adding the first supported feature to a particular CompilerId, it is
 necessary to list support for all features known to cmake (See
 :variable:`CMAKE_C_COMPILE_FEATURES` and
 :variable:`CMAKE_CXX_COMPILE_FEATURES` as appropriate), where available for
-the compiler.
+the compiler.  Furthermore, set ``CMAKE_<LANG>_STANDARD_DEFAULT`` to the
+default language standard level the compiler uses, or to the empty string
+if the compiler has no notion of standard levels (such as ``MSVC``).
 
 It is sensible to record the features for the most recent version of a
 particular CompilerId first, and then work backwards.  It is sensible to
@@ -774,7 +643,9 @@ by the :command:`find_package` command when invoked for ``<package>``.
 The primary task of a find module is to determine whether a package
 exists on the system, set the ``<package>_FOUND`` variable to reflect
 this and provide any variables, macros and imported targets required to
-use the package.
+use the package.  A find module is useful in cases where an upstream
+library does not provide a
+:ref:`config file package <Config File Packages>`.
 
 The traditional approach is to use variables for everything, including
 libraries and executables: see the `Standard Variable Names`_ section
@@ -782,13 +653,9 @@ below.  This is what most of the existing find modules provided by CMake
 do.
 
 The more modern approach is to behave as much like
-``<package>Config.cmake`` files as possible, by providing imported
-targets.  As well as matching how ``*Config.cmake`` files work, the
-libraries, include directories and compile definitions are all set just
-by using the target in a :command:`target_link_libraries` call.   The
-disadvantage is that ``*Config.cmake`` files of projects that use
-imported targets from find modules may require more work to make sure
-those imported targets that are in the link interface are available.
+:ref:`config file packages <Config File Packages>` files as possible, by
+providing :ref:`imported target <Imported targets>`.  This has the advantage
+of propagating :ref:`Target Usage Requirements` to consumers.
 
 In either case (or even when providing both variables and imported
 targets), find modules should provide backwards compatibility with old
@@ -932,7 +799,10 @@ To prevent users being overwhelmed with settings to configure, try to
 keep as many options as possible out of the cache, leaving at least one
 option which can be used to disable use of the module, or locate a
 not-found library (e.g. ``Xxx_ROOT_DIR``).  For the same reason, mark
-most cache options as advanced.
+most cache options as advanced.  For packages which provide both debug
+and release binaries, it is common to create cache variables with a
+``_LIBRARY_<CONFIG>`` suffix, such as ``Foo_LIBRARY_RELEASE`` and
+``Foo_LIBRARY_DEBUG``.
 
 While these are the standard variable names, you should provide
 backwards compatibility for any old names that were actually in use.
@@ -998,16 +868,6 @@ licence notice block
   #=============================================================================
   # (To distribute this file outside of CMake, substitute the full
   #  License text for the above reference.)
-
-If the module is new to CMake, you may want to provide a warning for
-projects that do not require a high enough CMake version.
-
-.. code-block:: cmake
-
-  if(CMAKE_MINIMUM_REQUIRED_VERSION VERSION_LESS 3.0.0)
-    message(AUTHOR_WARNING
-      "Your project should require at least CMake 3.0.0 to use FindFoo.cmake")
-  endif()
 
 Now the actual libraries and so on have to be found.  The code here will
 obviously vary from module to module (dealing with that, after all, is the
@@ -1114,6 +974,47 @@ similar properties should only contain information about the target itself, and
 not any of its dependencies.  Instead, those dependencies should also be
 targets, and CMake should be told that they are dependencies of this target.
 CMake will then combine all the necessary information automatically.
+
+The type of the :prop_tgt:`IMPORTED` target created in the
+:command:`add_library` command can always be specified as ``UNKNOWN``
+type.  This simplifies the code in cases where static or shared variants may
+be found, and CMake will determine the type by inspecting the files.
+
+If the library is available with multiple configurations, the
+:prop_tgt:`IMPORTED_CONFIGURATIONS` target property should also be
+populated:
+
+.. code-block:: cmake
+
+  if(Foo_FOUND)
+    if (NOT TARGET Foo::Foo)
+      add_library(Foo::Foo UNKNOWN IMPORTED)
+    endif()
+    if (Foo_LIBRARY_RELEASE)
+      set_property(TARGET Foo::Foo APPEND PROPERTY
+        IMPORTED_CONFIGURATIONS RELEASE
+      )
+      set_target_properties(Foo::Foo PROPERTIES
+        IMPORTED_LOCATION_RELEASE "${Foo_LIBRARY_RELEASE}"
+      )
+    endif()
+    if (Foo_LIBRARY_DEBUG)
+      set_property(TARGET Foo::Foo APPEND PROPERTY
+        IMPORTED_CONFIGURATIONS DEBUG
+      )
+      set_target_properties(Foo::Foo PROPERTIES
+        IMPORTED_LOCATION_DEBUG "${Foo_LIBRARY_DEBUG}"
+      )
+    endif()
+    set_target_properties(Foo::Foo PROPERTIES
+      INTERFACE_COMPILE_OPTIONS "${PC_Foo_CFLAGS_OTHER}"
+      INTERFACE_INCLUDE_DIRECTORIES "${Foo_INCLUDE_DIR}"
+    )
+  endif()
+
+The ``RELEASE`` variant should be listed first in the property
+so that that variant is chosen if the user uses a configuration which is
+not an exact match for any listed ``IMPORTED_CONFIGURATIONS``.
 
 Most of the cache variables should be hidden in the ``ccmake`` interface unless
 the user explicitly asks to edit them.

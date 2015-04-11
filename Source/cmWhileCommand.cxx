@@ -27,6 +27,8 @@ IsFunctionBlocked(const cmListFileFunction& lff, cmMakefile &mf,
     // if this is the endwhile for this while loop then execute
     if (!this->Depth)
       {
+      cmMakefile::LoopBlockPop loopBlockPop(&mf);
+
       // Remove the function blocker for this scope or bail.
       cmsys::auto_ptr<cmFunctionBlocker>
         fb(mf.RemoveFunctionBlocker(this, lff));
@@ -45,7 +47,7 @@ IsFunctionBlocked(const cmListFileFunction& lff, cmMakefile &mf,
 
       while (isTrue)
         {
-        if (errorString.size())
+        if (!errorString.empty())
           {
           std::string err = "had incorrect arguments: ";
           unsigned int i;
@@ -81,6 +83,10 @@ IsFunctionBlocked(const cmListFileFunction& lff, cmMakefile &mf,
             {
             return true;
             }
+          if (status.GetContinueInvoked())
+            {
+            break;
+            }
           if(cmSystemTools::GetFatalErrorOccured() )
             {
             return true;
@@ -114,7 +120,7 @@ ShouldRemove(const cmListFileFunction& lff, cmMakefile& )
     {
     // if the endwhile has arguments, then make sure
     // they match the arguments of the matching while
-    if (lff.Arguments.size() == 0 ||
+    if (lff.Arguments.empty() ||
         lff.Arguments == this->Args)
       {
       return true;
@@ -137,6 +143,8 @@ bool cmWhileCommand
   cmWhileFunctionBlocker *f = new cmWhileFunctionBlocker();
   f->Args = args;
   this->Makefile->AddFunctionBlocker(f);
+
+  this->Makefile->PushLoopBlock();
 
   return true;
 }

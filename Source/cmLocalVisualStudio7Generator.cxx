@@ -592,6 +592,15 @@ cmVS7FlagTable cmLocalVisualStudio7GeneratorLinkFlagTable[] =
   {0,0,0,0,0}
 };
 
+cmVS7FlagTable cmLocalVisualStudio7GeneratorFortranLinkFlagTable[] =
+{
+  {"LinkIncremental", "INCREMENTAL:NO", "link incremental",
+   "linkIncrementalNo", 0},
+  {"LinkIncremental", "INCREMENTAL:YES", "link incremental",
+   "linkIncrementalYes", 0},
+  {0,0,0,0,0}
+};
+
 //----------------------------------------------------------------------------
 // Helper class to write build event <Tool .../> elements.
 class cmLocalVisualStudio7Generator::EventWriter
@@ -1056,8 +1065,13 @@ void cmLocalVisualStudio7Generator::OutputBuildTool(std::ostream& fout,
     extraLinkOptions += " ";
     extraLinkOptions += targetLinkFlags;
     }
-  Options linkOptions(this, Options::Linker,
-                      cmLocalVisualStudio7GeneratorLinkFlagTable);
+  Options linkOptions(this, Options::Linker);
+  if(this->FortranProject)
+    {
+    linkOptions.AddTable(cmLocalVisualStudio7GeneratorFortranLinkFlagTable);
+    }
+  linkOptions.AddTable(cmLocalVisualStudio7GeneratorLinkFlagTable);
+
   linkOptions.Parse(extraLinkOptions.c_str());
   if(!this->ModuleDefinitionFile.empty())
     {
@@ -1101,7 +1115,7 @@ void cmLocalVisualStudio7Generator::OutputBuildTool(std::ostream& fout,
 
     if(this->GetVersion() < VS8 || this->FortranProject)
       {
-      cmOStringStream libdeps;
+      std::ostringstream libdeps;
       this->Internal->OutputObjects(libdeps, &target);
       if(!libdeps.str().empty())
         {
@@ -1699,7 +1713,7 @@ bool cmLocalVisualStudio7Generator
 
   // Write the children to temporary output.
   bool hasChildrenWithSources = false;
-  cmOStringStream tmpOut;
+  std::ostringstream tmpOut;
   for(unsigned int i=0;i<children.size();++i)
     {
     if(this->WriteGroup(&children[i], target, tmpOut, libName, configs))

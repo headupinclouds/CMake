@@ -51,7 +51,7 @@ if(BUILD_TESTING)
     set(CMake_TEST_DEVENV "${CMAKE_MAKE_PROGRAM}")
   endif()
 
-  if(CMAKE_GENERATOR MATCHES "Visual Studio")
+  if(CMAKE_GENERATOR MATCHES "Visual Studio|Xcode")
     set(CMake_TEST_EXPLICIT_MAKE_PROGRAM "")
   else()
     set(CMake_TEST_EXPLICIT_MAKE_PROGRAM "${CMAKE_MAKE_PROGRAM}")
@@ -110,10 +110,6 @@ if(BUILD_TESTING)
 
   add_subdirectory(FindPackageModeMakefileTest)
 
-  if(NOT CMake_TEST_EXTERNAL_CMAKE)
-    add_subdirectory(CTestTestMemcheck)
-  endif()
-
   # Collect a list of all test build directories.
   set(TEST_BUILD_DIRS)
 
@@ -171,7 +167,7 @@ if(BUILD_TESTING)
       OUTPUT_VARIABLE OSX_VERSION
       OUTPUT_STRIP_TRAILING_WHITESPACE
       )
-    if(OSX_VERSION MATCHES "^10\\.[0123]" OR OSX_VERSION MATCHES "ProductVersion:\t10\\.[0123]")
+    if(OSX_VERSION VERSION_LESS 10.4)
       message(STATUS "Forcing CTEST_TEST_CPACK=OFF on OSX < 10.4")
       message(STATUS "OSX_VERSION='${OSX_VERSION}'")
       set(CTEST_TEST_CPACK OFF)
@@ -292,6 +288,7 @@ if(BUILD_TESTING)
     ADD_TEST_MACRO(ConfigSources ConfigSources)
   endif()
   ADD_TEST_MACRO(SourcesProperty SourcesProperty)
+  ADD_TEST_MACRO(SourceFileProperty SourceFileProperty)
   if(CMAKE_CXX_COMPILER_ID STREQUAL GNU
       AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.7)
     set(runCxxDialectTest 1)
@@ -691,7 +688,8 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     FAIL_REGULAR_EXPRESSION "Unexpected: ")
   list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/ArgumentExpansion")
 
-  add_test(GeneratorExpression  ${CMAKE_CTEST_COMMAND}
+  add_test(GeneratorExpression
+    ${CMAKE_CTEST_COMMAND} -C \${CTEST_CONFIGURATION_TYPE}
     --build-and-test
     "${CMake_SOURCE_DIR}/Tests/GeneratorExpression"
     "${CMake_BINARY_DIR}/Tests/GeneratorExpression"
@@ -715,6 +713,8 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     --test-command CustomCommand
     )
   list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/CustomCommand")
+
+  ADD_TEST_MACRO(CustomCommandByproducts CustomCommandByproducts)
 
   ADD_TEST_MACRO(EmptyDepends ${CMAKE_CTEST_COMMAND})
 
@@ -951,7 +951,8 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
       set(CPackRun_CPackGen  "-DCPackGen=${CPackGen}")
       foreach(CPackComponentWay ${CWAYLST})
         set(CPackRun_CPackComponentWay "-DCPackComponentWay=${CPackComponentWay}")
-        add_test(CPackComponentsForAll-${CPackGen}-${CPackComponentWay} ${CMAKE_CTEST_COMMAND}
+        add_test(CPackComponentsForAll-${CPackGen}-${CPackComponentWay}
+          ${CMAKE_CTEST_COMMAND} -C \${CTEST_CONFIGURATION_TYPE}
           --build-and-test
           "${CMake_SOURCE_DIR}/Tests/CPackComponentsForAll"
           "${CMake_BINARY_DIR}/Tests/CPackComponentsForAll/build${CPackGen}-${CPackComponentWay}"
@@ -1241,6 +1242,13 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
         )
       list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/Qt4And5AutomocReverse")
     endif()
+  endif()
+
+  if(CMake_TEST_FindGSL)
+    add_subdirectory(FindGSL)
+  endif()
+  if(CMake_TEST_FindJsonCpp)
+    add_subdirectory(FindJsonCpp)
   endif()
 
   find_package(GTK2 QUIET)
@@ -1931,16 +1939,17 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
         ${BundleTestInstallDir}/Applications/SecondBundleExe.app/Contents/MacOS/SecondBundleExe)
       list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/BundleTest")
 
-      add_test(CFBundleTest ${CMAKE_CTEST_COMMAND}
+      add_test(NAME CFBundleTest COMMAND ${CMAKE_CTEST_COMMAND}
         --build-and-test
         "${CMake_SOURCE_DIR}/Tests/CFBundleTest"
         "${CMake_BINARY_DIR}/Tests/CFBundleTest"
         --build-two-config
         ${build_generator_args}
         --build-project CFBundleTest
+        --build-config $<CONFIGURATION>
         --build-options ${build_options}
         --test-command
-        ${CMAKE_CMAKE_COMMAND} -DCTEST_CONFIGURATION_TYPE=\${CTEST_CONFIGURATION_TYPE}
+        ${CMAKE_CMAKE_COMMAND} -DCTEST_CONFIGURATION_TYPE=$<CONFIGURATION>
         -Ddir=${CMake_BINARY_DIR}/Tests/CFBundleTest
         -Dgen=${CMAKE_GENERATOR}
         -P ${CMake_SOURCE_DIR}/Tests/CFBundleTest/VerifyResult.cmake)
@@ -2042,7 +2051,8 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     PASS_REGULAR_EXPRESSION "uninitialized variable 'USED_VARIABLE'")
   list(APPEND TEST_BUILD_DIRS "${CMake_BINARY_DIR}/Tests/WarnUninitialized")
 
-  add_test(TestsWorkingDirectory ${CMAKE_CTEST_COMMAND}
+  add_test(TestsWorkingDirectory
+    ${CMAKE_CTEST_COMMAND} -C \${CTEST_CONFIGURATION_TYPE}
     --build-and-test
     "${CMake_SOURCE_DIR}/Tests/TestsWorkingDirectory"
     "${CMake_BINARY_DIR}/Tests/TestsWorkingDirectory"
@@ -2257,6 +2267,18 @@ ${CMake_BINARY_DIR}/bin/cmake -DDIR=dev -P ${CMake_SOURCE_DIR}/Utilities/Release
     )
   set_tests_properties(CTestTestUpload PROPERTIES
     PASS_REGULAR_EXPRESSION "Upload\\.xml")
+
+  configure_file(
+    "${CMake_SOURCE_DIR}/Tests/CTestCoverageCollectGCOV/test.cmake.in"
+    "${CMake_BINARY_DIR}/Tests/CTestCoverageCollectGCOV/test.cmake"
+    @ONLY ESCAPE_QUOTES)
+  add_test(CTestCoverageCollectGCOV ${CMAKE_CTEST_COMMAND}
+    -S "${CMake_BINARY_DIR}/Tests/CTestCoverageCollectGCOV/test.cmake" -VV
+    --output-log "${CMake_BINARY_DIR}/Tests/CTestCoverageCollectGCOV/testOut.log"
+    )
+  set_tests_properties(CTestCoverageCollectGCOV PROPERTIES
+    PASS_REGULAR_EXPRESSION
+    "PASSED with correct output.*Testing/CoverageInfo/echoargs.gcov")
 
   configure_file(
     "${CMake_SOURCE_DIR}/Tests/CTestTestEmptyBinaryDirectory/test.cmake.in"

@@ -23,7 +23,7 @@ class cmFileLockResult;
 
 /**
   * @brief Cross-platform file locking.
-  * @detail Under the hood this class use 'fcntl' for Unix-like platforms and
+  * @details Under the hood this class use 'fcntl' for Unix-like platforms and
   * 'LockFileEx'/'UnlockFileEx' for Win32 platform. Locks are exclusive and
   * advisory.
   */
@@ -37,7 +37,7 @@ class cmFileLock
     * @brief Lock the file.
     * @param timeoutSec Lock timeout. If -1 try until success or fatal error.
     */
-  cmFileLockResult Lock(const std::string& filename, unsigned timeoutSec);
+  cmFileLockResult Lock(const std::string& filename, unsigned long timeoutSec);
 
   /**
     * @brief Unlock the file.
@@ -46,7 +46,7 @@ class cmFileLock
 
   /**
     * @brief Check file is locked by this class.
-    * @detail This function helps to find double locks (deadlocks) and to do
+    * @details This function helps to find double locks (deadlocks) and to do
     * explicit unlocks.
     */
   bool IsLocked(const std::string& filename) const;
@@ -57,7 +57,7 @@ class cmFileLock
 
   cmFileLockResult OpenFile();
   cmFileLockResult LockWithoutTimeout();
-  cmFileLockResult LockWithTimeout(unsigned timeoutSec);
+  cmFileLockResult LockWithTimeout(unsigned long timeoutSec);
 
 #if defined(_WIN32)
   typedef HANDLE FileId;

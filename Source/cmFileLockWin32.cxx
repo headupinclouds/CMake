@@ -86,7 +86,7 @@ cmFileLockResult cmFileLock::LockWithoutTimeout()
     }
 }
 
-cmFileLockResult cmFileLock::LockWithTimeout(unsigned seconds)
+cmFileLockResult cmFileLock::LockWithTimeout(unsigned long seconds)
 {
   const DWORD flags = LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY;
   while (true)
@@ -106,7 +106,7 @@ cmFileLockResult cmFileLock::LockWithTimeout(unsigned seconds)
       return cmFileLockResult::MakeTimeout();
       }
     --seconds;
-    ::Sleep(1000);
+    cmSystemTools::Delay(1000);
     }
 }
 
