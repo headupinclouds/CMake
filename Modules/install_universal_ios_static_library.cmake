@@ -90,7 +90,11 @@ function(install_universal_ios_static_library destination)
   endif()
 
   ### Build iphoneos and iphonesimulator variants
-  message(STATUS "[iOS universal] Build `${target}` for `iphoneos`")
+  message(
+      STATUS
+      "[iOS universal] Build `${target}` for `iphoneos` "
+      "(archs: ${IPHONEOS_ARCHS})"
+  )
 
   execute_process(
       COMMAND
@@ -138,6 +142,24 @@ function(install_universal_ios_static_library destination)
   if(NOT EXISTS "${iphoneos_src}")
     message(FATAL_ERROR "${iphoneos_src} not found")
   endif()
+
+  # Fix for targets with forced location. I.e. when ARCHIVE_OUTPUT_DIRECTORY
+  # property set both simulator and iphoneos library with have same destination,
+  # so each build will rewrite older one. Special directory used to keep
+  # intermediate results from overwriting.
+  set(_ios_universal_directory "${work_dir}/_3rdParty/ios-universal")
+
+  get_filename_component(_libname "${iphoneos_src}" NAME)
+
+  set(_iphoneos_lib "${_ios_universal_directory}/iphoneos/${_libname}")
+  set(_iphonesimulator_lib "${_ios_universal_directory}/iphonesimulator/${_libname}")
+
+  configure_file("${iphoneos_src}" "${_iphoneos_lib}" COPYONLY)
+
+  message(
+      STATUS
+      "[iOS universal] Done: ${_iphoneos_lib} (from: ${iphoneos_src})"
+  )
 
   message(STATUS "[iOS universal] Build `${target}` for `iphonesimulator`")
 
@@ -188,12 +210,23 @@ function(install_universal_ios_static_library destination)
     message(FATAL_ERROR "${iphonesimulator_src} not found")
   endif()
 
+  configure_file("${iphonesimulator_src}" "${_iphonesimulator_lib}" COPYONLY)
+
+  message(
+      STATUS
+      "[iOS universal] Done: ${_iphonesimulator_lib} "
+      "(from: ${iphonesimulator_src}"
+  )
+
+  message(STATUS "[iOS universal] simulator: ${_iphonesimulator_lib}")
+  message(STATUS "[iOS universal] device: ${_iphoneos_lib}")
+
   execute_process(
       COMMAND
       lipo
       -create
-      "${iphonesimulator_src}"
-      "${iphoneos_src}"
+      "${_iphonesimulator_lib}"
+      "${_iphoneos_lib}"
       -output ${library_destination}
       WORKING_DIRECTORY
       "${work_dir}"
