@@ -65,6 +65,21 @@ function(install_universal_ios_static_library destination)
     message(FATAL_ERROR "xcodebuild failed")
   endif()
 
+  # Calculate number of architectures
+  # If only one architecture valid no need to build universal library
+  # since library already installed
+  set(_all_archs "${IPHONESIMULATOR_ARCHS} ${IPHONEOS_ARCHS}")
+
+  # this is space separated string, let's make a CMake list
+  string(REPLACE " " ";" _all_archs "${_all_archs}")
+  list(REMOVE_ITEM _all_archs "") # remove empty elements
+  list(REMOVE_DUPLICATES _all_archs)
+  list(LENGTH _all_archs _all_archs_number)
+  if(_all_archs_number EQUAL 1)
+    message("[iOS universal] Skip: only one valid architecture (${_all_archs})")
+    return()
+  endif()
+
   ### Library output name
   execute_process(
       COMMAND
