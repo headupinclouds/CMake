@@ -142,7 +142,7 @@ void cmInstallGenerator
     }
   os << ")\n";
   if (type == cmInstallType_STATIC_LIBRARY) {
-    os << indent << "install_universal_ios_static_library(\"" << dest;
+    os << indent << "install_universal_ios_library(\"" << dest;
     os << "\")\n";
   }
 }
