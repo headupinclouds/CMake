@@ -1,7 +1,7 @@
 # Copyright (c) 2014, Ruslan Baratov
 # All rights reserved.
 
-function(install_universal_ios_static_library destination)
+function(install_universal_ios_library destination)
   if(NOT APPLE)
     return()
   endif()
