@@ -475,9 +475,9 @@ void cmLocalGenerator::GenerateInstallRules()
     "      CMAKE_INSTALL_CONFIG_NAME\n"
     "      \"${CMAKE_INSTALL_CONFIG_NAME}\"\n"
     "  )\n"
-    "  if(NOT INSTALL_UNIVERSAL_IOS_STATIC_LIBRARY_TOP)\n"
+    "  if(NOT INSTALL_UNIVERSAL_IOS_LIBRARY_TOP)\n"
     "    include(install_universal_ios_static_library)\n"
-    "    set(INSTALL_UNIVERSAL_IOS_STATIC_LIBRARY_TOP \"${CMAKE_CURRENT_LIST_DIR}\")\n"
+    "    set(INSTALL_UNIVERSAL_IOS_LIBRARY_TOP \"${CMAKE_CURRENT_LIST_DIR}\")\n"
     "  endif()\n"
     "endif()\n\n";
 
