@@ -141,7 +141,11 @@ void cmInstallGenerator
     os << literal_args;
     }
   os << ")\n";
-  if (type == cmInstallType_STATIC_LIBRARY) {
+  if (
+      (type == cmInstallType_STATIC_LIBRARY) ||
+      (type == cmInstallType_SHARED_LIBRARY) ||
+      (type == cmInstallType_MODULE_LIBRARY)
+  ) {
     os << indent << "install_universal_ios_library(\"" << dest;
     os << "\")\n";
   }
