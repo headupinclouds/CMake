@@ -233,6 +233,39 @@ function(install_universal_ios_library destination)
       "(from: ${iphonesimulator_src}"
   )
 
+  # If linked with other fat libraries this library can contain extra
+  # architectures. Remove them to avoid 'lipo -create' error. Ignore result
+  # since architectures may not exist.
+  execute_process(
+      COMMAND lipo -remove i386 -output "${_iphoneos_lib}" "${_iphoneos_lib}"
+      WORKING_DIRECTORY
+      "${work_dir}"
+  )
+
+  execute_process(
+      COMMAND lipo -remove x86_64 -output "${_iphoneos_lib}" "${_iphoneos_lib}"
+      WORKING_DIRECTORY
+      "${work_dir}"
+  )
+
+  execute_process(
+      COMMAND lipo -remove armv7 -output "${_iphonesimulator_lib}" "${_iphonesimulator_lib}"
+      WORKING_DIRECTORY
+      "${work_dir}"
+  )
+
+  execute_process(
+      COMMAND lipo -remove armv7s -output "${_iphonesimulator_lib}" "${_iphonesimulator_lib}"
+      WORKING_DIRECTORY
+      "${work_dir}"
+  )
+
+  execute_process(
+      COMMAND lipo -remove arm64 -output "${_iphonesimulator_lib}" "${_iphonesimulator_lib}"
+      WORKING_DIRECTORY
+      "${work_dir}"
+  )
+
   message(STATUS "[iOS universal] simulator: ${_iphonesimulator_lib}")
   message(STATUS "[iOS universal] device: ${_iphoneos_lib}")
 
